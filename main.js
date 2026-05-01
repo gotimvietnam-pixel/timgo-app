@@ -50,8 +50,18 @@ function getDefaultData() {
       surge_hours: { start: 7, end: 9, start2: 17, end2: 19 },
       night_hours: { start: 22, end: 5 },
     },
-    settings: { default_commission_type: 'percent', default_commission_value: 20, calc_method: 'km' },
+    settings: {
+      default_commission_type: 'percent', default_commission_value: 20, calc_method: 'km',
+      fund: {
+        purpose: 'Bảo trì xe + hỗ trợ tài xế',
+        per_trip: { enabled: true, amount: 2000 },
+        per_day: { enabled: false, amount: 10000, absent_policy: 'skip' },
+        percent: { enabled: true, value: 5 },
+      },
+    },
     walletHistory: [],
+    fundTransactions: [],
+    fundExpenses: [],
     debts: [],
     invoices: [],
     activityLog: [],
@@ -70,7 +80,11 @@ function loadData() {
       if (!d.invoices) d.invoices = [];
       if (!d.activityLog) d.activityLog = [];
       if (!d.shifts) d.shifts = [];
+      if (!d.fundTransactions) d.fundTransactions = [];
+      if (!d.fundExpenses) d.fundExpenses = [];
       if (!d.pricing) d.pricing = getDefaultData().pricing;
+      if (!d.settings) d.settings = getDefaultData().settings;
+      if (!d.settings.fund) d.settings.fund = getDefaultData().settings.fund;
       return d;
     }
   } catch (e) {}
@@ -560,7 +574,7 @@ function renderAdmin() {
   stopDriverGPS();
   app().innerHTML = [
     adminDashboard(), adminDrivers(), adminTrips(), adminFinance(),
-    adminPricing(), adminDebts(), adminSettings(),
+    adminPricing(), adminDebts(), adminQuyConfig(), adminQuyReport(), adminSettings(),
     `<div class="modal-overlay" id="modal-ov" onclick="G.closeModal()"><div class="modal-sheet" onclick="event.stopPropagation()" id="modal-c"></div></div>`,
     adminNav()
   ].join('');
@@ -806,12 +820,183 @@ function adminDebts() {
   </div>`;
 }
 
+function getFundBalance() {
+  const inAmt = (D.fundTransactions||[]).reduce((s,t)=>s+(t.amount||0),0);
+  const outAmt = (D.fundExpenses||[]).reduce((s,e)=>s+(e.amount||0),0);
+  return inAmt - outAmt;
+}
+
+function adminQuyConfig() {
+  const f = (D.settings.fund) || { per_trip:{enabled:false,amount:0}, per_day:{enabled:false,amount:0,absent_policy:'skip'}, percent:{enabled:false,value:0}, purpose:'' };
+  const tripAmts = [500, 1000, 2000, 3000, 5000];
+  const dayAmts = [5000, 10000, 15000, 20000, 30000];
+  const pctVals = [1, 3, 5, 7, 10, 15];
+
+  const sampleTrips = 30, sampleAmount = 30000;
+  const sampleComm = sampleAmount * 0.2;
+  let inFund = 0; const inDriver = sampleAmount * sampleTrips;
+  if (f.per_trip.enabled) inFund += f.per_trip.amount * sampleTrips;
+  if (f.percent.enabled) inFund += sampleComm * sampleTrips * f.percent.value / 100;
+  if (f.per_day.enabled) inFund += f.per_day.amount;
+  const driverNet = inDriver - inFund;
+
+  const radioPick = (group, vals, selected) => vals.map(v =>
+    `<label style="display:inline-block;padding:6px 12px;margin:4px;border-radius:8px;background:${selected===v?'var(--primary)':'var(--bg-card)'};color:${selected===v?'#fff':'var(--text)'};cursor:pointer;font-weight:600;border:1px solid var(--border);">
+      <input type="radio" name="quy-${group}" value="${v}" ${selected===v?'checked':''} style="display:none" onchange="G.previewQuy()" /> ${fmt(v)}${group==='pct'?'%':'đ'}
+    </label>`).join('');
+
+  return `<div class="screen" id="scr-a-quy-config">
+    <div class="header"><div class="header-top"><div><div class="header-name">⚙️ Cài đặt quỹ</div><div class="header-date">Quỹ hiện: ${fmt(getFundBalance())}đ</div></div></div></div>
+
+    <div class="section" style="margin-top:16px;">
+      <div class="stat-card" style="opacity:1;text-align:left;padding:16px;">
+        <label class="form-label">Mục đích quỹ</label>
+        <input type="text" class="form-input" id="quy-purpose" value="${(f.purpose||'').replace(/"/g,'&quot;')}" placeholder="VD: Bảo trì xe + hỗ trợ anh em" />
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title mb-8">📋 Phương thức đóng quỹ (chọn 1 hoặc nhiều)</div>
+
+      <div class="stat-card" style="opacity:1;text-align:left;padding:16px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <input type="checkbox" id="quy-trip-en" ${f.per_trip.enabled?'checked':''} onchange="G.previewQuy()" style="width:20px;height:20px;" />
+          <label for="quy-trip-en" style="font-weight:700;">Đóng theo CUỐC (cố định)</label>
+        </div>
+        <div style="margin-left:30px;">
+          <div style="margin-bottom:6px;color:var(--text-muted);font-size:13px;">Mỗi cuốc trừ:</div>
+          <div>${radioPick('trip', tripAmts, f.per_trip.amount)}</div>
+          <input type="number" class="form-input" id="quy-trip-custom" placeholder="Tự nhập (đ)" value="${tripAmts.includes(f.per_trip.amount)?'':f.per_trip.amount||''}" oninput="G.previewQuy()" style="margin-top:8px;" />
+        </div>
+      </div>
+
+      <div class="stat-card" style="opacity:1;text-align:left;padding:16px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <input type="checkbox" id="quy-day-en" ${f.per_day.enabled?'checked':''} onchange="G.previewQuy()" style="width:20px;height:20px;" />
+          <label for="quy-day-en" style="font-weight:700;">Đóng theo NGÀY (cố định)</label>
+        </div>
+        <div style="margin-left:30px;">
+          <div style="margin-bottom:6px;color:var(--text-muted);font-size:13px;">Mỗi ngày trừ:</div>
+          <div>${radioPick('day', dayAmts, f.per_day.amount)}</div>
+          <input type="number" class="form-input" id="quy-day-custom" placeholder="Tự nhập (đ)" value="${dayAmts.includes(f.per_day.amount)?'':f.per_day.amount||''}" oninput="G.previewQuy()" style="margin-top:8px;" />
+          <div style="margin-top:10px;">
+            <div style="font-size:13px;margin-bottom:4px;">Khi tài xế nghỉ:</div>
+            <label style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;"><input type="radio" name="quy-absent" value="skip" ${f.per_day.absent_policy==='skip'?'checked':''} /> Không thu (công bằng)</label>
+            <label style="display:inline-flex;align-items:center;gap:6px;"><input type="radio" name="quy-absent" value="bu" ${f.per_day.absent_policy==='bu'?'checked':''} /> Bù vào ngày sau</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-card" style="opacity:1;text-align:left;padding:16px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <input type="checkbox" id="quy-pct-en" ${f.percent.enabled?'checked':''} onchange="G.previewQuy()" style="width:20px;height:20px;" />
+          <label for="quy-pct-en" style="font-weight:700;">Đóng theo PHẦN TRĂM commission</label>
+        </div>
+        <div style="margin-left:30px;">
+          <div style="margin-bottom:6px;color:var(--text-muted);font-size:13px;">Lấy % từ hoa hồng:</div>
+          <div>${radioPick('pct', pctVals, f.percent.value)}</div>
+          <input type="number" class="form-input" id="quy-pct-custom" placeholder="Tự nhập (%)" value="${pctVals.includes(f.percent.value)?'':f.percent.value||''}" oninput="G.previewQuy()" style="margin-top:8px;" />
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title mb-8">👁️ Xem trước tác động</div>
+      <div id="quy-preview" class="stat-card" style="opacity:1;text-align:left;padding:16px;background:var(--bg-secondary);">
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Ví dụ: tài xế chạy ${sampleTrips} cuốc, mỗi cuốc ${fmt(sampleAmount)}đ:</div>
+        <div class="summary-row"><span class="label">💰 Doanh thu</span><span class="value">${fmt(inDriver)}đ</span></div>
+        <div class="summary-row"><span class="label">🟣 Vào quỹ</span><span class="value text-primary fw-bold">${fmt(inFund)}đ</span></div>
+        <div class="summary-row"><span class="label">💵 Tài xế nhận</span><span class="value text-success fw-bold">${fmt(driverNet)}đ</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <button class="btn btn-primary" onclick="G.saveQuyConfig()">💾 Lưu cài đặt quỹ</button>
+      <button class="btn btn-outline mt-8" onclick="G.showA('scr-a-settings')">← Quay lại</button>
+    </div>
+  </div>`;
+}
+
+function adminQuyReport() {
+  const balance = getFundBalance();
+  const tx = D.fundTransactions || [];
+  const ex = D.fundExpenses || [];
+  const tdy = today();
+  const ym = tdy.substring(0,7);
+  const txMonth = tx.filter(t => (t.date||'').startsWith(ym));
+  const exMonth = ex.filter(e => (e.date||'').startsWith(ym));
+  const txToday = tx.filter(t => t.date === tdy);
+  const exToday = ex.filter(e => e.date === tdy);
+  const sumIn = arr => arr.reduce((s,t)=>s+(t.amount||0),0);
+  const inToday = sumIn(txToday), inMonth = sumIn(txMonth);
+  const outToday = sumIn(exToday), outMonth = sumIn(exMonth);
+  const drvAgg = {};
+  txMonth.forEach(t => {
+    if (!t.driver_id) return;
+    if (!drvAgg[t.driver_id]) drvAgg[t.driver_id] = { count:0, amount:0 };
+    drvAgg[t.driver_id].count++; drvAgg[t.driver_id].amount += t.amount;
+  });
+  const drvList = Object.entries(drvAgg).map(([did,v]) => ({ name: driverName(did), ...v })).sort((a,b)=>b.amount-a.amount);
+
+  return `<div class="screen" id="scr-a-quy-report">
+    <div class="header"><div class="header-top"><div><div class="header-name">🟣 Báo cáo quỹ</div><div class="header-date">Cập nhật: ${vnDate()}</div></div></div></div>
+
+    <div class="section" style="margin-top:16px;">
+      <div class="stat-card" style="opacity:1;text-align:left;padding:20px;background:linear-gradient(135deg,#7C3AED,#A855F7);color:#fff;">
+        <div style="font-size:13px;opacity:0.9;">QUỸ HIỆN TẠI</div>
+        <div style="font-size:32px;font-weight:800;margin:8px 0;">${fmtFull(balance)}</div>
+        <div style="font-size:12px;opacity:0.85;">${(D.settings.fund?.purpose)||'Quỹ chung'}</div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">⬆️</div><div class="stat-value text-success">${fmt(inToday)}</div><div class="stat-label">Thu hôm nay</div></div>
+      <div class="stat-card"><div class="stat-icon">⬇️</div><div class="stat-value text-warning">${fmt(outToday)}</div><div class="stat-label">Chi hôm nay</div></div>
+      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value">${fmt(inMonth)}</div><div class="stat-label">Thu tháng này</div></div>
+      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value text-warning">${fmt(outMonth)}</div><div class="stat-label">Chi tháng này</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><div class="section-title">💸 Chi tiêu quỹ</div><button class="btn btn-sm btn-success" onclick="G.addFundExpenseModal()">➕ Thêm chi</button></div>
+      ${exMonth.length === 0 ? '<div class="alert alert-info">Chưa có khoản chi nào tháng này</div>' :
+        exMonth.slice(0,10).map(e => `<div class="trip-card">
+          <div class="trip-header"><span class="trip-number">🔧 ${e.note||'Chi quỹ'}</span><span class="trip-time">${e.date}</span></div>
+          <div class="trip-amount text-warning">-${fmtFull(e.amount)}</div>
+          ${e.target ? `<div class="trip-note">👤 Cho: ${e.target}</div>` : ''}
+        </div>`).join('')}
+    </div>
+
+    <div class="section">
+      <div class="section-title mb-8">👥 Đóng góp tháng (theo tài xế)</div>
+      ${drvList.length === 0 ? '<div class="alert alert-info">Chưa có đóng góp tháng này</div>' :
+        drvList.map(d => `<div class="trip-card">
+          <div class="trip-header"><span class="trip-number">👤 ${d.name}</span><span class="trip-time">${d.count} cuốc</span></div>
+          <div class="trip-amount text-primary">${fmtFull(d.amount)}</div>
+        </div>`).join('')}
+    </div>
+
+    <div class="section">
+      <div class="section-title mb-8">📋 Lịch sử thu gần nhất</div>
+      ${txMonth.slice(-10).reverse().map(t => `<div class="trip-card">
+        <div class="trip-header"><span class="trip-number">${driverName(t.driver_id)} · ${t.source||'cuốc'}</span><span class="trip-time">${t.date}</span></div>
+        <div class="trip-amount text-success">+${fmtFull(t.amount)}</div>
+      </div>`).join('')}
+    </div>
+
+    <div class="section">
+      <button class="btn btn-outline mt-8" onclick="G.showA('scr-a-settings')">← Quay lại</button>
+    </div>
+  </div>`;
+}
+
 function adminSettings() {
   return `<div class="screen" id="scr-a-settings">
     <div class="header"><div class="header-top"><div><div class="header-name">⚙️ Cài đặt & Thêm</div></div></div></div>
     <div class="section" style="margin-top:16px;">
       <div class="section-title mb-8">📱 Menu</div>
       <div class="driver-card" onclick="G.showA('scr-a-pricing')" style="cursor:pointer"><div class="driver-top"><div class="driver-avatar" style="font-size:24px">🧮</div><div><div class="driver-name">Bảng giá dịch vụ</div><div class="driver-plate">Cài đặt giá theo km, tuyến, giờ</div></div></div></div>
+      <div class="driver-card" onclick="G.showA('scr-a-quy-config')" style="cursor:pointer;border-left:3px solid #7C3AED;"><div class="driver-top"><div class="driver-avatar" style="font-size:24px;background:#7C3AED;color:#fff;">🟣</div><div><div class="driver-name">Cài đặt quỹ</div><div class="driver-plate">${D.settings.fund?.per_trip?.enabled?'☑Cuốc ':''}${D.settings.fund?.per_day?.enabled?'☑Ngày ':''}${D.settings.fund?.percent?.enabled?'☑%':''} · ${(D.settings.fund?.purpose||'Chưa cài')}</div></div></div></div>
+      <div class="driver-card" onclick="G.showA('scr-a-quy-report')" style="cursor:pointer;border-left:3px solid #10B981;"><div class="driver-top"><div class="driver-avatar" style="font-size:24px;background:#10B981;color:#fff;">📊</div><div><div class="driver-name">Báo cáo quỹ</div><div class="driver-plate">Hiện có: ${fmt(getFundBalance())}đ</div></div></div></div>
       <div class="driver-card" onclick="G.showA('scr-a-debts')" style="cursor:pointer"><div class="driver-top"><div class="driver-avatar" style="font-size:24px">⚠️</div><div><div class="driver-name">Quản lý công nợ</div><div class="driver-plate">${D.debts.filter(d=>d.status==='pending').length} khoản chưa thu</div></div></div></div>
       <div class="driver-card" style="cursor:pointer"><div class="driver-top"><div class="driver-avatar" style="font-size:24px">📊</div><div><div class="driver-name">Nhật ký hoạt động</div><div class="driver-plate">${D.activityLog.length} bản ghi</div></div></div></div>
     </div>
@@ -1413,6 +1598,23 @@ window.G = {
     };
     D.trips.push(trip);
 
+    // Fund contribution (auto-deduct theo cài đặt)
+    const fundCfg = D.settings.fund || {};
+    let fundContrib = 0;
+    if (fundCfg.per_trip?.enabled) fundContrib += fundCfg.per_trip.amount || 0;
+    if (fundCfg.percent?.enabled) fundContrib += Math.round(comm * (fundCfg.percent.value || 0) / 100);
+    if (fundContrib > 0) {
+      const ftx = {
+        id: 'ftx' + Date.now(), trip_id: tid, driver_id: U.id,
+        amount: fundContrib, source: 'cuoc', note: 'Cuốc #' + num,
+        date: today(), created_at: now.toISOString(),
+      };
+      if (!D.fundTransactions) D.fundTransactions = [];
+      D.fundTransactions.push(ftx);
+      const drv = D.users.find(u => u.id === U.id);
+      if (drv) drv.wallet = (drv.wallet || 0) - fundContrib;
+    }
+
     // Create invoice
     const invoice = { id: 'inv'+Date.now(), trip_id: tid, driver_id: U.id, amount: amt, service_type: svc, distance_km: km, commission: comm, payment_status: payStatus, payment_method: payMethod, created_at: now.toISOString(), date: today() };
     D.invoices.push(invoice);
@@ -1660,6 +1862,91 @@ window.G = {
 
   reset() {
     if (confirm('🔄 Reset toàn bộ?')) { localStorage.removeItem(STORAGE_KEY); D = loadData(); renderLogin(); }
+  },
+
+  // ============================================================
+  // FUND (Quỹ) HANDLERS
+  // ============================================================
+  previewQuy() {
+    const tripEn = $('quy-trip-en')?.checked;
+    const dayEn = $('quy-day-en')?.checked;
+    const pctEn = $('quy-pct-en')?.checked;
+    const tripCustom = parseInt($('quy-trip-custom')?.value);
+    const dayCustom = parseInt($('quy-day-custom')?.value);
+    const pctCustom = parseInt($('quy-pct-custom')?.value);
+    const tripRadio = parseInt(document.querySelector('input[name="quy-trip"]:checked')?.value || 0);
+    const dayRadio = parseInt(document.querySelector('input[name="quy-day"]:checked')?.value || 0);
+    const pctRadio = parseInt(document.querySelector('input[name="quy-pct"]:checked')?.value || 0);
+    const tripAmt = tripCustom || tripRadio || 0;
+    const dayAmt = dayCustom || dayRadio || 0;
+    const pctVal = pctCustom || pctRadio || 0;
+    const sampleTrips = 30, sampleAmount = 30000;
+    const sampleComm = sampleAmount * 0.2;
+    let inFund = 0;
+    if (tripEn) inFund += tripAmt * sampleTrips;
+    if (pctEn) inFund += sampleComm * sampleTrips * pctVal / 100;
+    if (dayEn) inFund += dayAmt;
+    const inDriver = sampleAmount * sampleTrips;
+    const driverNet = inDriver - inFund;
+    const preview = $('quy-preview');
+    if (preview) {
+      preview.innerHTML = `
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Ví dụ: tài xế chạy ${sampleTrips} cuốc, mỗi cuốc ${fmt(sampleAmount)}đ:</div>
+        <div class="summary-row"><span class="label">💰 Doanh thu</span><span class="value">${fmt(inDriver)}đ</span></div>
+        <div class="summary-row"><span class="label">🟣 Vào quỹ</span><span class="value text-primary fw-bold">${fmt(inFund)}đ</span></div>
+        <div class="summary-row"><span class="label">💵 Tài xế nhận</span><span class="value text-success fw-bold">${fmt(driverNet)}đ</span></div>
+      `;
+    }
+  },
+
+  saveQuyConfig() {
+    const tripCustom = parseInt($('quy-trip-custom')?.value);
+    const dayCustom = parseInt($('quy-day-custom')?.value);
+    const pctCustom = parseInt($('quy-pct-custom')?.value);
+    const tripRadio = parseInt(document.querySelector('input[name="quy-trip"]:checked')?.value || 0);
+    const dayRadio = parseInt(document.querySelector('input[name="quy-day"]:checked')?.value || 0);
+    const pctRadio = parseInt(document.querySelector('input[name="quy-pct"]:checked')?.value || 0);
+    const absentPolicy = document.querySelector('input[name="quy-absent"]:checked')?.value || 'skip';
+    if (!D.settings) D.settings = {};
+    D.settings.fund = {
+      purpose: $('quy-purpose')?.value?.trim() || 'Quỹ chung',
+      per_trip: { enabled: !!$('quy-trip-en')?.checked, amount: tripCustom || tripRadio || 0 },
+      per_day: { enabled: !!$('quy-day-en')?.checked, amount: dayCustom || dayRadio || 0, absent_policy: absentPolicy },
+      percent: { enabled: !!$('quy-pct-en')?.checked, value: pctCustom || pctRadio || 0 },
+    };
+    addLog('quy_config', 'Cập nhật cài đặt quỹ');
+    saveData(D);
+    alert('✅ Đã lưu cài đặt quỹ');
+    renderAdmin(); G.showA('scr-a-quy-config');
+  },
+
+  addFundExpenseModal() {
+    const drivers = D.users.filter(u => u.role === 'driver');
+    openModal(`<div class="modal-handle"></div><div class="modal-title">💸 Thêm khoản chi quỹ</div>
+      <div class="form-group"><label class="form-label">Số tiền (đ)</label><input type="number" class="form-input" id="fex-amt" placeholder="VD: 500000" /></div>
+      <div class="form-group"><label class="form-label">Mục đích</label><input type="text" class="form-input" id="fex-note" placeholder="VD: Bảo trì xe" /></div>
+      <div class="form-group"><label class="form-label">Cho ai (tùy chọn)</label>
+        <select class="form-input" id="fex-target"><option value="">— Không chọn —</option>${drivers.map(d => `<option value="${d.name}">${d.name}</option>`).join('')}</select>
+      </div>
+      <button class="btn btn-primary" onclick="G.addFundExpense()">💾 Lưu</button>
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>
+    `);
+  },
+
+  addFundExpense() {
+    const amt = parseInt($('fex-amt')?.value) || 0;
+    const note = $('fex-note')?.value?.trim() || 'Chi quỹ';
+    const target = $('fex-target')?.value || '';
+    if (amt <= 0) { alert('Nhập số tiền hợp lệ'); return; }
+    const exp = {
+      id: 'fex' + Date.now(), amount: amt, note, target,
+      date: today(), created_at: new Date().toISOString(),
+    };
+    if (!D.fundExpenses) D.fundExpenses = [];
+    D.fundExpenses.push(exp);
+    addLog('fund_expense', `Chi quỹ ${fmt(amt)}đ — ${note}`);
+    saveData(D);
+    G.closeModal(); renderAdmin(); G.showA('scr-a-quy-report');
   }
 };
 
