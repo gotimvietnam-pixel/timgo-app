@@ -14,19 +14,14 @@ import {
 // ============================================================
 // DATA STORE
 // ============================================================
-const STORAGE_KEY = 'timgo_v2_data';
+const STORAGE_KEY = 'timgo_v5_data';
 const DB_ONLINE = initSupabase();
 
 function getDefaultData() {
   const today = new Date().toISOString().split('T')[0];
   return {
     users: [
-      { id: 'admin1', name: 'Admin Tím Go', phone: '0901234567', password: '123456', role: 'admin', status: 'active', created_at: today },
-      { id: 'd1', name: 'Nguyễn Văn An', phone: '0911111111', password: '111111', role: 'driver', vehicle_plate: '59P1-12345', vehicle_type: 'xe_may', status: 'active', commission_type: 'percent', commission_value: 20, online: true, wallet: 500000, created_at: today },
-      { id: 'd2', name: 'Trần Minh Bảo', phone: '0922222222', password: '222222', role: 'driver', vehicle_plate: '59P1-67890', vehicle_type: 'xe_may', status: 'active', commission_type: 'percent', commission_value: 20, online: true, wallet: 320000, created_at: today },
-      { id: 'd3', name: 'Lê Hoàng Cường', phone: '0933333333', password: '333333', role: 'driver', vehicle_plate: '59P1-11111', vehicle_type: 'xe_may', status: 'active', commission_type: 'percent', commission_value: 20, online: false, wallet: 180000, created_at: today },
-      { id: 'd4', name: 'Phạm Thanh Dũng', phone: '0944444444', password: '444444', role: 'driver', vehicle_plate: '59P2-22222', vehicle_type: 'xe_may', status: 'active', commission_type: 'percent', commission_value: 20, online: true, wallet: 760000, created_at: today },
-      { id: 'd5', name: 'Võ Quốc Em', phone: '0955555555', password: '555555', role: 'driver', vehicle_plate: '59P2-33333', vehicle_type: 'xe_may', status: 'active', commission_type: 'percent', commission_value: 15, online: true, wallet: 420000, created_at: today },
+      { id: 'admin1', name: 'Tâm Thịnh', phone: '0948505077', password: 'Tamthinh123', role: 'admin', status: 'active', created_at: today },
     ],
     trips: [],
     pricing: {
@@ -547,21 +542,49 @@ function renderLogin() {
       <div class="login-subtitle">Quản lý tài xế chuyên nghiệp</div>
       <div class="login-card">
         <div class="login-role-tabs">
-          <button class="role-tab active" id="rt-admin" onclick="G.setRole('admin')">🔑 Admin</button>
-          <button class="role-tab" id="rt-driver" onclick="G.setRole('driver')">🏍️ Tài xế</button>
+          <button class="role-tab active" id="tab-login" onclick="G.switchAuthTab('login')">🔑 Đăng nhập</button>
+          <button class="role-tab" id="tab-register" onclick="G.switchAuthTab('register')">📝 Đăng ký TX</button>
         </div>
-        <div class="form-group">
-          <label class="form-label">Số điện thoại</label>
-          <input type="tel" class="form-input" id="inp-phone" placeholder="VD: 0901234567" />
+
+        <div id="form-login">
+          <div class="form-group">
+            <label class="form-label">Số điện thoại</label>
+            <input type="tel" class="form-input" id="inp-phone" placeholder="VD: 0948505077" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mật khẩu</label>
+            <input type="password" class="form-input" id="inp-pass" placeholder="Nhập mật khẩu" />
+          </div>
+          <div id="login-err" class="alert alert-danger" style="display:none"></div>
+          <button class="btn btn-primary" onclick="G.login()">Đăng nhập</button>
+          <div class="text-center text-muted" style="margin-top:16px;font-size:11px;">
+            Tài xế mới? Bấm tab <b>📝 Đăng ký TX</b> bên trên
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Mật khẩu</label>
-          <input type="password" class="form-input" id="inp-pass" placeholder="Nhập mật khẩu" />
-        </div>
-        <div id="login-err" class="alert alert-danger" style="display:none"></div>
-        <button class="btn btn-primary" onclick="G.login()">Đăng nhập</button>
-        <div class="text-center text-muted" style="margin-top:16px;font-size:11px;">
-          🔑 Admin: 0901234567 / 123456<br>🏍️ TX: 0911111111 / 111111
+
+        <div id="form-register" style="display:none;">
+          <div class="form-group">
+            <label class="form-label">Số điện thoại *</label>
+            <input type="tel" class="form-input" id="reg-phone" placeholder="0xxx..." inputmode="numeric" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Họ tên *</label>
+            <input type="text" class="form-input" id="reg-name" placeholder="Nguyễn Văn..." />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mật khẩu *</label>
+            <input type="password" class="form-input" id="reg-pass" placeholder="Tối thiểu 6 ký tự" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Biển số xe</label>
+            <input type="text" class="form-input" id="reg-plate" placeholder="VD: 59P1-12345" />
+          </div>
+          <div id="reg-err" class="alert alert-danger" style="display:none"></div>
+          <div id="reg-ok" class="alert alert-success" style="display:none"></div>
+          <button class="btn btn-primary" onclick="G.register()">📝 Gửi đăng ký</button>
+          <div class="text-center text-muted" style="margin-top:12px;font-size:11px;">
+            Sau khi đăng ký, admin sẽ duyệt tài khoản trước khi anh có thể chạy đơn.
+          </div>
         </div>
       </div>
     </div>`;
@@ -649,10 +672,24 @@ function tripCard(t, showDriver) {
 
 function adminDrivers() {
   const drivers = D.users.filter(u => u.role === 'driver');
+  const pending = drivers.filter(d => d.status === 'pending');
+  const active = drivers.filter(d => d.status === 'active');
+  const blocked = drivers.filter(d => d.status === 'blocked');
   return `<div class="screen" id="scr-a-drivers">
-    <div class="header"><div class="header-top"><div><div class="header-name">👤 Quản lý tài xế</div><div class="header-date">${drivers.filter(d=>d.status==='active').length} hoạt động · ${drivers.length} tổng</div></div><div class="header-badge" onclick="G.addDriverModal()">➕</div></div></div>
+    <div class="header"><div class="header-top"><div><div class="header-name">👤 Quản lý tài xế</div><div class="header-date">${pending.length>0?'🟡 '+pending.length+' chờ duyệt · ':''}${active.length} hoạt động · ${blocked.length} khóa</div></div><div class="header-badge" onclick="G.addDriverModal()">➕</div></div></div>
+    ${pending.length > 0 ? `
     <div class="section" style="margin-top:16px;">
-    ${drivers.map(d => {
+      <div class="section-title mb-8" style="color:var(--warning);">⏳ Chờ duyệt (${pending.length})</div>
+      ${pending.map(d => `<div class="driver-card" style="border-left:3px solid var(--warning);" onclick="G.driverDetail('${d.id}')">
+        <div class="driver-top">
+          <div class="driver-avatar" style="background:var(--warning);color:#fff;">⏳</div>
+          <div><div class="driver-name">${d.name}</div><div class="driver-plate">📞 ${d.phone} · 🏍️ ${d.vehicle_plate||'Chưa có'}</div></div>
+          <button class="btn btn-sm btn-success" onclick="event.stopPropagation();G.approveDriver('${d.id}')" style="padding:6px 14px;">✅ Duyệt</button>
+        </div>
+      </div>`).join('')}
+    </div>` : ''}
+    <div class="section" style="margin-top:16px;">
+    ${drivers.filter(d => d.status !== 'pending').map(d => {
       const tr = todayTrips(d.id);
       const amt = tr.reduce((s,t)=>s+t.amount,0);
       const debt = tr.filter(t=>t.payment_status==='debt').reduce((s,t)=>s+t.amount,0);
@@ -1194,7 +1231,66 @@ function openModal(html) { $('modal-c').innerHTML = html; $('modal-ov').classLis
 window.G = {
   setRole(r) {
     document.querySelectorAll('.role-tab').forEach(t=>t.classList.remove('active'));
-    $(`rt-${r}`).classList.add('active');
+    const el = $(`rt-${r}`);
+    if (el) el.classList.add('active');
+  },
+
+  switchAuthTab(tab) {
+    document.querySelectorAll('.role-tab').forEach(t=>t.classList.remove('active'));
+    $(`tab-${tab}`).classList.add('active');
+    $('form-login').style.display = tab === 'login' ? 'block' : 'none';
+    $('form-register').style.display = tab === 'register' ? 'block' : 'none';
+  },
+
+  async register() {
+    const phone = $('reg-phone').value.trim();
+    const name = $('reg-name').value.trim();
+    const pass = $('reg-pass').value;
+    const plate = $('reg-plate').value.trim();
+    const errEl = $('reg-err');
+    const okEl = $('reg-ok');
+    const showErr = msg => { errEl.textContent = msg; errEl.style.display = 'flex'; okEl.style.display = 'none'; };
+
+    if (!phone || !name || !pass) { showErr('❌ Vui lòng nhập SĐT, họ tên và mật khẩu'); return; }
+    if (!/^0\d{9,10}$/.test(phone)) { showErr('❌ SĐT không hợp lệ (bắt đầu bằng 0, 10-11 số)'); return; }
+    if (pass.length < 6) { showErr('❌ Mật khẩu tối thiểu 6 ký tự'); return; }
+
+    // Check phone uniqueness — load latest cloud data first if online
+    if (DB_ONLINE) {
+      try {
+        const cloud = await loadDataFromCloud();
+        if (cloud) D = cloud;
+      } catch (e) { /* fallback to local */ }
+    }
+    if (D.users.find(u => u.phone === phone)) {
+      showErr('❌ SĐT này đã được đăng ký');
+      return;
+    }
+
+    const pw_hash = await hashPassword(pass);
+    const newDriver = {
+      id: 'd' + Date.now(),
+      name, phone, password: pass, password_hash: pw_hash,
+      role: 'driver',
+      vehicle_plate: plate, vehicle_type: 'xe_may',
+      status: 'pending',
+      commission_type: 'percent',
+      commission_value: D.settings?.default_commission_value || 20,
+      online: false, wallet: 0,
+      created_at: today(),
+    };
+    D.users.push(newDriver);
+    addLog('driver_register', `Đăng ký mới: ${name} (${phone})`);
+    saveData(D);
+    if (DB_ONLINE) dbSaveUser(newDriver).catch(e => console.error('Register sync:', e));
+
+    errEl.style.display = 'none';
+    okEl.innerHTML = `✅ Đăng ký thành công!<br>Tài khoản đang <b>chờ admin duyệt</b>. Anh sẽ được thông báo khi tài khoản kích hoạt.`;
+    okEl.style.display = 'flex';
+    $('reg-phone').value = '';
+    $('reg-name').value = '';
+    $('reg-pass').value = '';
+    $('reg-plate').value = '';
   },
   async login() {
     const phone = $('inp-phone').value.trim(), pass = $('inp-pass').value;
@@ -1242,6 +1338,12 @@ window.G = {
       
       if (user.status === 'blocked') {
         $('login-err').textContent = '🔒 Tài khoản đã bị khóa!';
+        $('login-err').style.display = 'flex';
+        if (btn) { btn.textContent = '🚀 Đăng nhập'; btn.disabled = false; }
+        return;
+      }
+      if (user.status === 'pending') {
+        $('login-err').textContent = '⏳ Tài khoản đang chờ admin duyệt!';
         $('login-err').style.display = 'flex';
         if (btn) { btn.textContent = '🚀 Đăng nhập'; btn.disabled = false; }
         return;
@@ -1685,9 +1787,47 @@ window.G = {
         <div class="summary-row"><span class="label">Hoa hồng</span><span class="value text-primary fw-bold">${fmtFull(comm)}</span></div>
         <div class="summary-row"><span class="label">Nợ</span><span class="value ${debt>0?'text-warning':'text-success'} fw-bold">${fmtFull(debt)}</span></div>
       </div>
-      ${d.status==='active'?`<button class="btn btn-danger" onclick="G.toggleBlock('${d.id}',true)">🔒 Khóa</button>`:`<button class="btn btn-success" onclick="G.toggleBlock('${d.id}',false)">🔓 Mở khóa</button>`}
+      ${d.status==='pending' ? `<button class="btn btn-success" onclick="G.approveDriver('${d.id}')">✅ Duyệt tài khoản</button>` : ''}
+      ${d.status==='active'?`<button class="btn btn-danger mt-8" onclick="G.toggleBlock('${d.id}',true)">🔒 Khóa</button>`:''}
+      ${d.status==='blocked'?`<button class="btn btn-success mt-8" onclick="G.toggleBlock('${d.id}',false)">🔓 Mở khóa</button>`:''}
+      <button class="btn btn-outline mt-8" onclick="G.editDriverName('${d.id}')">✏️ Đổi tên</button>
+      <button class="btn btn-outline mt-8" onclick="G.deleteDriver('${d.id}')" style="color:var(--danger);border-color:var(--danger);">🗑️ Xóa tài khoản</button>
       <button class="btn btn-outline mt-8" onclick="G.closeModal()">Đóng</button>
     `);
+  },
+
+  approveDriver(id) {
+    const u = D.users.find(x=>x.id===id);
+    if (!u) return;
+    u.status = 'active';
+    addLog('driver_approve', `Duyệt TX: ${u.name}`);
+    saveData(D);
+    if (DB_ONLINE) dbUpdateUserField(id, 'status', 'active').catch(e => console.error('Approve sync:', e));
+    G.closeModal(); renderAdmin(); G.showA('scr-a-drivers');
+    alert('✅ Đã duyệt ' + u.name);
+  },
+
+  deleteDriver(id) {
+    const u = D.users.find(x=>x.id===id);
+    if (!u) return;
+    if (!confirm(`🗑️ Xóa hẳn tài khoản "${u.name}"?\n\nCảnh báo: KHÔNG khôi phục lại được.`)) return;
+    D.users = D.users.filter(x => x.id !== id);
+    addLog('driver_delete', `Xóa TX: ${u.name} (${u.phone})`);
+    saveData(D);
+    // TODO: dbDeleteUser if exists
+    G.closeModal(); renderAdmin(); G.showA('scr-a-drivers');
+  },
+
+  editDriverName(id) {
+    const u = D.users.find(x=>x.id===id);
+    if (!u) return;
+    const newName = prompt('Đổi tên tài xế:', u.name);
+    if (!newName || newName.trim() === '' || newName === u.name) return;
+    u.name = newName.trim();
+    addLog('driver_rename', `Đổi tên: ${u.phone} → ${u.name}`);
+    saveData(D);
+    if (DB_ONLINE) dbUpdateUserField(id, 'name', u.name).catch(e => console.error('Rename sync:', e));
+    G.closeModal(); renderAdmin(); G.showA('scr-a-drivers');
   },
 
   toggleBlock(id, block) {
@@ -1959,12 +2099,13 @@ window.G = {
     try {
       const defaults = getDefaultData();
       generateSampleTrips(defaults);
-      await seedDatabase(defaults);
-      // Load from cloud
-      const cloud = await loadDataFromCloud();
+      // Race với timeout 5s để app không bao giờ hang nếu Supabase chậm/down
+      const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('Supabase timeout')), ms))]);
+      await withTimeout(seedDatabase(defaults), 5000);
+      const cloud = await withTimeout(loadDataFromCloud(), 5000);
       if (cloud) D = cloud;
     } catch (e) {
-      console.warn('Supabase init failed, using localStorage:', e);
+      console.warn('Supabase init failed, using localStorage:', e?.message || e);
     }
   }
   renderLogin();
