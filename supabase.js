@@ -123,16 +123,26 @@ export async function dbUpdateUserField(userId, field, value) {
   if (error) console.error('❌ updateUserField:', error);
 }
 
+export async function dbDeleteUser(userId) {
+  if (!isOnline) return;
+  const { error } = await supabase.from('users').delete().eq('id', userId);
+  if (error) console.error('❌ deleteUser:', error);
+}
+
 function mapUserToDB(u) {
   return {
     id: u.id,
-    name: u.name,
-    phone: u.phone,
-    password_hash: u.password_hash || u.password || '',
+    name: u.name || '',
+    phone: u.phone || null,               // Nullable: TX Zalo chưa có SĐT
+    password_hash: u.password_hash || u.password || null, // Nullable: Zalo-only
     role: u.role,
-    status: u.status || 'active',
+    status: u.status || 'pending',
+    zalo_id: u.zalo_id || null,            // Zalo OAuth ID
+    zalo_name: u.zalo_name || null,        // Tên Zalo
+    zalo_avatar: u.zalo_avatar || null,    // Avatar Zalo
     vehicle_plate: u.vehicle_plate || null,
     vehicle_type: u.vehicle_type || 'xe_may',
+    cccd: u.cccd || null,
     commission_type: u.commission_type || 'percent',
     commission_value: u.commission_value || 20,
     online: u.online || false,

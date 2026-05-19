@@ -1,0 +1,168 @@
+{% schema %}
+{
+  "name": "header",
+  "settings": [
+    {
+      "type": "text",
+      "id": "logo",
+      "label": "Logo",
+      "default": "Kin & Paws"
+    }
+  ]
+}
+{% endschema %}
+
+<header class="site-header">
+  <div class="container">
+    <nav class="nav">
+      <div class="nav-left">
+        <a class="nav-item" href="{{ shop.url }}">{{ settings.logo }}</a>
+      </div>
+      <div class="nav-right nav-menu">
+        <ul>
+          <li><a href="{{ shop.url }}">Home</a></li>
+          <li><a href="{{ routes.collections_url }}">Shop</a></li>
+          <li><a href="{{ shop.url }}/pages/contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="nav-right nav-search">
+        <form action="{{ routes.search_url }}" method="get">
+          <input type="search" name="q" placeholder="Search...">
+          <button type="submit">Search</button>
+        </form>
+      </div>
+      <button class="nav-toggle" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    background-color: #fff;
+    padding: 1em;
+    text-align: center;
+  }
+  .nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .nav-left {
+    flex: 1;
+  }
+  .nav-right {
+    flex: 1;
+    text-align: right;
+  }
+  .nav-menu {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .nav-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .nav-menu li {
+    display: inline-block;
+    margin-left: 20px;
+  }
+  .nav-menu a {
+    text-decoration: none;
+    color: #333;
+  }
+  .nav-search {
+    margin-left: 20px;
+  }
+  .nav-search input[type='search'] {
+    padding: 10px;
+    border: 1px solid #ddd;
+  }
+  .nav-search button[type='submit'] {
+    background-color: #333;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+  }
+  .nav-toggle {
+    display: none;
+    background-color: #333;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+  }
+  .nav-toggle span {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background-color: #fff;
+    margin-bottom: 5px;
+  }
+  @media (max-width: 768px) {
+    .nav-menu {
+      display: none;
+    }
+    .nav-toggle {
+      display: block;
+    }
+    .nav-search {
+      display: none;
+    }
+  }
+  @media (max-width: 768px) {
+    .nav-menu {
+      display: block;
+      position: absolute;
+      top: 60px;
+      left: 0;
+      width: 100%;
+      background-color: #fff;
+      padding: 20px;
+      border: 1px solid #ddd;
+      display: none;
+    }
+    .nav-menu ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .nav-menu li {
+      display: block;
+      margin-bottom: 10px;
+    }
+    .nav-menu a {
+      text-decoration: none;
+      color: #333;
+    }
+  }
+  .nav-toggle:focus + .nav-menu,
+  .nav-menu:hover {
+    display: block;
+  }
+
+/* Mobile Responsive Audit Patch */
+@media (max-width: 480px) {
+  .btn, .button, button, a.btn, a.button {
+    min-height: 48px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  input, select, textarea {
+    font-size: 16px !important; /* Prevent iOS zoom */
+  }
+}
+</style>
+
+<script>
+  const navToggle = document.querySelector('.nav-toggle');
+  navToggle.addEventListener('click', () => {
+    document.querySelector('.nav-menu').classList.toggle('show');
+  });
+</script>

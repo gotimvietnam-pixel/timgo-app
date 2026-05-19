@@ -1,3 +1,2081 @@
+# BÁO CÁO MÃ NGUỒN (SOURCE CODE) - TÍM GO V3.0
+
+*Ngày xuất: 15:20:25 16/4/2026*
+
+---
+
+## File: `index.html`
+
+```html
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Tím Go" />
+  <meta name="theme-color" content="#7C3AED" />
+  <meta name="zalo-platform-site-verification" content="ETw4TBsfC5rAsuX0bVWZRnJ7zMBuiI0-DpGu" />
+  <meta name="description" content="Tím Go — Hệ thống quản lý tài xế xe ôm và giao hàng chuyên nghiệp tại Phước Long, Bạc Liêu" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-512.png" />
+  <title>Tím Go — Xe ôm & Giao hàng</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBNEPzaZxB2z3ySvW9LRxgQz6qnUAJZpiQ&libraries=places,geometry,marker&v=weekly" async defer></script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main id="app" role="main" aria-label="Ứng dụng Tím Go"></main>
+  <script type="module" src="/main.js"></script>
+  <script>
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
+
+```
+
+## File: `style.css`
+
+```css
+/* ========================================
+   🟣 TÍM GO — Design System
+   ======================================== */
+
+:root {
+  /* Brand Colors */
+  --primary: #6D28D9;
+  --primary-light: #8B5CF6;
+  --primary-dark: #4C1D95;
+  --primary-bg: #F5F3FF;
+  --primary-gradient: linear-gradient(135deg, #6D28D9 0%, #8B5CF6 100%);
+
+  /* Status Colors */
+  --success: #059669;
+  --success-bg: #D1FAE5;
+  --warning: #D97706;
+  --warning-bg: #FEF3C7;
+  --danger: #DC2626;
+  --danger-bg: #FEE2E2;
+  --info: #2563EB;
+  --info-bg: #DBEAFE;
+
+  /* Neutral */
+  --bg: #F9FAFB;
+  --surface: #FFFFFF;
+  --border: #E5E7EB;
+  --text: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #6B7280;
+
+  /* Spacing */
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-lg: 24px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.03);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ========================================
+   App Shell
+   ======================================== */
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+  background: var(--bg);
+}
+
+.screen { 
+  display: none; 
+  padding-bottom: 80px;
+  animation: fadeIn 0.3s ease;
+}
+.screen.active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes pendingPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(239,68,68,0.4); }
+  50% { transform: scale(1.1); box-shadow: 0 0 20px rgba(239,68,68,0.6); }
+}
+
+/* ========================================
+   Login Screen
+   ======================================== */
+
+.login-screen {
+  min-height: 100vh;
+  background: var(--primary-gradient);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  padding-bottom: 24px !important;
+}
+
+.login-logo {
+  width: 100px;
+  height: 100px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  margin-bottom: 16px;
+  backdrop-filter: blur(10px);
+  animation: pulse 2s ease infinite;
+}
+
+.login-title {
+  color: white;
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.login-subtitle {
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  margin-bottom: 40px;
+}
+
+.login-card {
+  width: 100%;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 32px 24px;
+  box-shadow: var(--shadow-lg);
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-family: inherit;
+  transition: all 0.2s;
+  background: var(--bg);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
+}
+
+.pass-toggle {
+  position: absolute;
+  right: 12px;
+  top: 38px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+}
+.admin-pass-toggle {
+  color: rgba(255,255,255,0.5);
+}
+
+.btn-spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+.btn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: var(--primary-gradient);
+  color: white;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.2);
+}
+
+.btn-success {
+  background: var(--success);
+  color: white;
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid var(--border);
+  color: var(--text);
+}
+
+.btn-sm {
+  padding: 10px 16px;
+  font-size: 13px;
+  width: auto;
+  border-radius: 8px;
+}
+
+.login-role-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.role-tab {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  color: var(--text-secondary);
+}
+
+.role-tab.active {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+/* ========================================
+   Admin Login Screen (Dark Professional)
+   ======================================== */
+
+.admin-login-screen {
+  background: linear-gradient(135deg, #1a1025 0%, #2d1b4e 50%, #1e1145 100%) !important;
+  justify-content: center !important;
+  position: relative;
+}
+
+.admin-login-bg {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 20% 30%, rgba(124,58,237,0.15) 0%, transparent 50%),
+                     radial-gradient(circle at 80% 70%, rgba(167,139,250,0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.admin-login-card {
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(20px);
+  position: relative;
+  z-index: 1;
+}
+
+.admin-login-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.admin-login-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.admin-login-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: white;
+  letter-spacing: -0.5px;
+}
+
+.admin-login-subtitle {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.admin-input {
+  background: rgba(255,255,255,0.08) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+  color: white !important;
+}
+
+.admin-input:focus {
+  border-color: var(--primary-light) !important;
+  background: rgba(255,255,255,0.12) !important;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.2) !important;
+}
+
+.admin-input::placeholder {
+  color: rgba(255,255,255,0.3) !important;
+}
+
+.btn-admin-login {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%);
+  color: white;
+  box-shadow: 0 4px 16px rgba(124,58,237,0.4);
+  transition: all 0.2s;
+}
+
+.btn-admin-login:active {
+  transform: scale(0.98);
+}
+
+.admin-login-footer {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.admin-login-switch {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.2s;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.admin-login-switch:hover,
+.admin-login-switch:active {
+  color: rgba(255,255,255,0.7);
+}
+
+/* ========================================
+   Driver Login Screen (Bright Friendly)
+   ======================================== */
+
+.driver-login-screen {
+  background: linear-gradient(180deg, #7C3AED 0%, #A78BFA 40%, #EDE9FE 70%, #F9FAFB 100%) !important;
+  justify-content: flex-start !important;
+  padding-top: 60px !important;
+}
+
+.driver-login-bg {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 50% 20%, rgba(255,255,255,0.15) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.driver-login-hero {
+  text-align: center;
+  margin-bottom: 32px;
+  position: relative;
+  z-index: 1;
+}
+
+.driver-login-card {
+  position: relative;
+  z-index: 1;
+  animation: slideUp 0.4s ease;
+}
+
+.btn-zalo-login {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  background: #0068FF;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0,104,255,0.3);
+  margin-bottom: 16px;
+}
+
+.btn-zalo-login:active {
+  transform: scale(0.98);
+  background: #0052CC;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.login-divider span {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.driver-login-switch {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.2s;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.driver-login-switch:hover,
+.driver-login-switch:active {
+  color: var(--primary-dark);
+}
+
+
+/* ========================================
+   Header
+   ======================================== */
+
+.header {
+  background: var(--primary-gradient);
+  padding: 20px 20px 24px;
+  color: white;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.header-greeting {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.header-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.header-date {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.header-badge {
+  width: 44px;
+  height: 44px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  position: relative;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.notification-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  background: var(--danger);
+  border-radius: 50%;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border: 2px solid var(--primary);
+}
+
+/* ========================================
+   Stats Cards
+   ======================================== */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: -16px 16px 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.stat-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px 12px;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  animation: slideUp 0.4s ease forwards;
+  opacity: 0;
+}
+
+.stat-card:nth-child(1) { animation-delay: 0.1s; }
+.stat-card:nth-child(2) { animation-delay: 0.15s; }
+.stat-card:nth-child(3) { animation-delay: 0.2s; }
+.stat-card:nth-child(4) { animation-delay: 0.25s; }
+.stat-card:nth-child(5) { animation-delay: 0.3s; }
+.stat-card:nth-child(6) { animation-delay: 0.35s; }
+
+.stat-icon {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+/* ========================================
+   Section
+   ======================================== */
+
+.section {
+  padding: 0 16px;
+  margin-bottom: 20px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.section-action {
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+/* ========================================
+   Trip Card
+   ======================================== */
+
+.trip-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--primary);
+  transition: all 0.2s;
+}
+
+.trip-card:active {
+  transform: scale(0.98);
+}
+
+.trip-card.debt {
+  border-left-color: var(--warning);
+}
+
+.trip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.trip-number {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.trip-time {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.trip-amount {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.trip-note {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.trip-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.trip-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trip-status.paid {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.trip-status.debt {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.trip-running-total {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.trip-commission {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ========================================
+   Driver Card (Admin view)
+   ======================================== */
+
+.driver-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.driver-card:active {
+  transform: scale(0.98);
+}
+
+.driver-card.blocked {
+  opacity: 0.5;
+}
+
+.driver-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.driver-avatar {
+  width: 48px;
+  height: 48px;
+  background: var(--primary-bg);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.driver-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.driver-plate {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.driver-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-left: auto;
+}
+
+.driver-status-dot.online { background: var(--success); }
+.driver-status-dot.offline { background: var(--text-muted); }
+
+.driver-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.driver-stat {
+  text-align: center;
+  padding: 8px 4px;
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+.driver-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.driver-stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.driver-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ========================================
+   Alert Card
+   ======================================== */
+
+.alert {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-warning {
+  background: var(--warning-bg);
+  color: #92400E;
+}
+
+.alert-danger {
+  background: var(--danger-bg);
+  color: #991B1B;
+}
+
+.alert-success {
+  background: var(--success-bg);
+  color: #065F46;
+}
+
+/* ========================================
+   Modal / Bottom Sheet
+   ======================================== */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 100;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal-sheet {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 24px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease;
+}
+
+.modal-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 20px;
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+/* ========================================
+   Bottom Nav
+   ======================================== */
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding: 8px 0;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 50;
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: none;
+  border: none;
+  font-family: inherit;
+}
+
+.nav-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.nav-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.nav-item.active .nav-label {
+  color: var(--primary);
+}
+
+.nav-item.active .nav-icon {
+  transform: scale(1.1);
+}
+
+/* Add trip FAB */
+.fab-add {
+  position: fixed;
+  bottom: max(80px, calc(60px + env(safe-area-inset-bottom)));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 64px;
+  background: var(--primary-gradient);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: white;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+  z-index: 51;
+  transition: all 0.2s;
+}
+
+.fab-add:active {
+  transform: translateX(-50%) scale(0.92);
+}
+
+/* ========================================
+   Quick Amount Buttons
+   ======================================== */
+
+.quick-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.quick-amount {
+  padding: 8px 14px;
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-light);
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.quick-amount:active {
+  background: var(--primary);
+  color: white;
+}
+
+/* ========================================
+   Payment Status Toggle
+   ======================================== */
+
+.payment-toggle {
+  display: flex;
+  gap: 10px;
+}
+
+.payment-option {
+  flex: 1;
+  padding: 14px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg);
+  font-family: inherit;
+}
+
+.payment-option.active.paid {
+  border-color: var(--success);
+  background: var(--success-bg);
+}
+
+.payment-option.active.debt {
+  border-color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.payment-option .payment-icon {
+  font-size: 24px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.payment-option .payment-text {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ========================================
+   Summary Bar
+   ======================================== */
+
+.summary-bar {
+  background: var(--primary-bg);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-top: 16px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.summary-row .label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.summary-row .value {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.summary-row.highlight .value {
+  color: var(--primary);
+  font-size: 16px;
+}
+
+/* ========================================
+   History / Report
+   ======================================== */
+
+.date-filter {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.date-chip {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.date-chip.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.history-day {
+  padding: 12px 16px;
+  background: var(--bg);
+}
+
+.history-day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.history-day-date {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.history-day-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ========================================
+   Chart placeholder
+   ======================================== */
+
+.chart-container {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 120px;
+  padding-top: 10px;
+}
+
+.chart-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.chart-bar {
+  width: 100%;
+  max-width: 32px;
+  background: var(--primary-gradient);
+  border-radius: 6px 6px 0 0;
+  min-height: 8px;
+  transition: height 0.5s ease;
+}
+
+.chart-bar-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.chart-bar-value {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ========================================
+   Utility classes
+   ======================================== */
+
+.text-success { color: var(--success) !important; }
+.text-warning { color: var(--warning) !important; }
+.text-danger { color: var(--danger) !important; }
+.text-primary { color: var(--primary) !important; }
+.text-muted { color: var(--text-muted) !important; }
+.text-center { text-align: center; }
+.fw-bold { font-weight: 700; }
+.mt-8 { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-16 { margin-bottom: 16px; }
+.gap-8 { gap: 8px; }
+.flex { display: flex; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+
+/* ========================================
+   Fare Calculator
+   ======================================== */
+
+.fare-calc-container {
+  padding: 16px;
+}
+
+.fare-inputs {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.fare-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.fare-input-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 3px solid white;
+  box-shadow: 0 0 0 2px;
+}
+
+.fare-input-dot.dot-a {
+  background: #10B981;
+  color: #10B981;
+}
+
+.fare-input-dot.dot-b {
+  background: #EF4444;
+  color: #EF4444;
+}
+
+.fare-dot-sm {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.fare-dot-sm.dot-a { background: #10B981; }
+.fare-dot-sm.dot-b { background: #EF4444; }
+
+.fare-input-field {
+  flex: 1;
+  position: relative;
+}
+
+.fare-input-field .form-input {
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.fare-input-connector {
+  width: 2px;
+  height: 16px;
+  background: var(--border);
+  margin-left: 6px;
+  border-radius: 1px;
+  position: relative;
+  left: 0;
+}
+
+.fare-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.fare-action-btn {
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fare-action-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+}
+
+.fare-action-btn:active {
+  transform: scale(0.92);
+}
+
+/* Suggestions dropdown */
+.fare-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  z-index: 20;
+  display: none;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+}
+
+.fare-sug-item {
+  padding: 12px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--border);
+}
+
+.fare-sug-item:last-child { border-bottom: none; }
+
+.fare-sug-item:hover {
+  background: var(--primary-bg);
+}
+
+.fare-sug-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* Map */
+.fare-map-wrap {
+  width: 100%;
+  height: 350px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.fare-map-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fare-hint-badge {
+  width: 22px;
+  height: 22px;
+  background: var(--primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Fare Marker */
+.fare-marker-wrapper { background: none !important; border: none !important; }
+
+.fare-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.fare-marker-pin {
+  width: 20px;
+  height: 20px;
+  background: var(--fc-color);
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 3px solid white;
+  box-shadow: 0 0 0 2px var(--fc-color);
+}
+
+.fare-marker-label {
+  background: var(--fc-color);
+  color: white;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+  border: 2px solid white;
+}
+
+/* Results */
+.fare-results {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-md);
+  min-height: 100px;
+}
+
+.fare-empty-state {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--text-secondary);
+}
+
+.fare-loading {
+  text-align: center;
+  padding: 32px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--primary);
+  animation: pulse 1.5s ease infinite;
+}
+
+.fare-result-header {
+  margin-bottom: 16px;
+}
+
+.fare-result-route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.fare-route-text {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fare-arrow {
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
+.fare-result-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fare-stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--primary-bg);
+  border-radius: 20px;
+  font-size: 13px;
+  color: var(--primary-dark);
+}
+
+.fare-stat-pill.warn {
+  background: var(--warning-bg);
+  color: #92400E;
+}
+
+.fare-price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.fare-price-card {
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+
+.fare-price-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
+}
+
+.fare-price-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.fare-price-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.fare-price-detail {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.fare-alert {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.fare-alert.warn {
+  background: var(--warning-bg);
+  color: #92400E;
+}
+
+.fare-alert.info {
+  background: var(--info-bg);
+  color: #1E40AF;
+}
+
+/* ========================================
+   Responsive
+   ======================================== */
+@media (min-width: 481px) and (max-width: 1023px) {
+  #app {
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    box-shadow: 0 0 40px rgba(0,0,0,0.05);
+  }
+}
+
+/* ========================================
+   Desktop Layout (≥1024px)
+   ======================================== */
+@media (min-width: 1024px) {
+  #app {
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .desktop-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* --- Sidebar --- */
+  .sidebar {
+    width: 240px;
+    background: linear-gradient(180deg, #1E1B4B 0%, #312E81 100%);
+    color: white;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+  }
+
+  .sidebar-brand {
+    padding: 28px 20px 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .sidebar-logo {
+    width: 60px;
+    height: 60px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    margin: 0 auto 10px;
+    backdrop-filter: blur(10px);
+    animation: pulse 2.5s ease infinite;
+  }
+
+  .sidebar-title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+
+  .sidebar-ver {
+    font-size: 11px;
+    opacity: 0.5;
+    margin-top: 2px;
+    letter-spacing: 1px;
+  }
+
+  .sidebar-nav {
+    flex: 1;
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: rgba(255,255,255,0.7);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    text-align: left;
+    width: 100%;
+  }
+
+  .sidebar-item:hover {
+    background: rgba(255,255,255,0.1);
+    color: white;
+  }
+
+  .sidebar-item.active {
+    background: rgba(124, 58, 237, 0.4);
+    color: white;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+  }
+
+  .sidebar-item.logout {
+    color: rgba(255,255,255,0.5);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    margin-top: auto;
+  }
+
+  .sidebar-item.logout:hover {
+    color: #EF4444;
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .sidebar-footer {
+    padding: 12px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+
+  /* --- Main Content Area --- */
+  .desktop-content {
+    margin-left: 240px;
+    flex: 1;
+    min-height: 100vh;
+    background: var(--bg);
+  }
+
+  .desktop-content .screen {
+    padding-bottom: 24px;
+  }
+
+  /* --- Hide mobile bottom nav on desktop --- */
+  .desktop-layout .bottom-nav {
+    display: none !important;
+  }
+
+  /* --- Desktop header adjustments --- */
+  .desktop-content .header {
+    border-radius: 0;
+    padding: 24px 32px;
+  }
+
+  /* --- Desktop stats grid --- */
+  .desktop-content .stats-grid {
+    margin: -16px 24px 20px;
+    gap: 16px;
+  }
+
+  /* --- Desktop sections --- */
+  .desktop-content .section {
+    padding: 0 24px;
+  }
+
+  /* --- Desktop map container --- */
+  .desktop-content .map-container {
+    width: calc(100% - 48px);
+    height: 400px;
+    margin: -8px auto 16px;
+  }
+
+  /* --- Desktop modal centering --- */
+  .desktop-content .modal-overlay {
+    align-items: center;
+  }
+
+  .desktop-content .modal-sheet {
+    border-radius: var(--radius-lg);
+    max-width: 560px;
+  }
+
+  /* --- Desktop trip cards in grid --- */
+  .desktop-content .driver-stats {
+    gap: 12px;
+  }
+
+  /* --- Fullscreen map on desktop --- */
+  .desktop-content .map-container.map-fullscreen {
+    max-width: 100%;
+    left: 0;
+    transform: none;
+    height: 80vh;
+  }
+
+  /* --- Login screen on desktop --- */
+  .login-card {
+    max-width: 420px;
+  }
+
+  /* --- Fare Calculator on desktop --- */
+  .desktop-content .fare-calc-container {
+    padding: 24px;
+  }
+
+  .desktop-content .fare-map-wrap {
+    height: 450px;
+  }
+
+  .desktop-content .fare-price-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .desktop-content .fare-route-text {
+    max-width: 300px;
+  }
+}
+
+/* Large Desktop (≥1440px) */
+@media (min-width: 1440px) {
+  .sidebar {
+    width: 280px;
+  }
+
+  .desktop-content {
+    margin-left: 280px;
+  }
+
+  .desktop-content .stats-grid {
+    grid-template-columns: repeat(6, 1fr);
+    margin: -16px 32px 24px;
+  }
+
+  .desktop-content .section {
+    padding: 0 32px;
+  }
+
+  .desktop-content .map-container {
+    width: calc(100% - 64px);
+    height: 450px;
+  }
+}
+
+/* ========================================
+   GPS Map
+   ======================================== */
+.map-container {
+  width: calc(100% - 32px);
+  margin: -8px auto 16px;
+  height: 280px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  z-index: 1;
+}
+
+.map-container .leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius);
+}
+
+.driver-marker-wrapper { background: none !important; border: none !important; }
+
+.driver-marker-pro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.marker-dot {
+  width: 18px;
+  height: 18px;
+  background: var(--marker-color);
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 0 0 2px var(--marker-color);
+  transition: all 0.3s;
+}
+
+.marker-dot.moving {
+  animation: markerPulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 0 2px var(--marker-color), 0 0 12px var(--marker-color);
+}
+
+@keyframes markerPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 2px var(--marker-color), 0 0 0 rgba(59,130,246,0); }
+  50% { transform: scale(1.15); box-shadow: 0 0 0 2px var(--marker-color), 0 0 16px var(--marker-color); }
+}
+
+.marker-name {
+  background: var(--marker-color);
+  color: white;
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+  border: 1.5px solid white;
+}
+
+.marker-speed {
+  background: rgba(0,0,0,0.7);
+  color: #FCD34D;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Driver marker label (legacy compat) */
+.driver-marker-label {
+  background: var(--primary);
+  color: white;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(124,58,237,0.3);
+  border: 2px solid white;
+}
+
+.driver-marker-label.offline {
+  background: var(--text-muted);
+}
+
+/* Map legend */
+.map-legend {
+  display: flex;
+  gap: 16px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.map-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.map-legend-dot.green { background: var(--success); }
+.map-legend-dot.blue { background: #3B82F6; }
+.map-legend-dot.gray { background: var(--text-muted); }
+.map-legend-dot.pulse {
+  background: var(--primary);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Fullscreen map */
+.map-container.map-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  height: 70vh;
+  margin: 0;
+  border-radius: 0;
+  z-index: 90;
+}
+
+/* Driver Status List */
+.driver-status-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.driver-status-item:active { transform: scale(0.98); }
+
+.dsi-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.dsi-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.dsi-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dsi-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.dsi-detail {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dsi-trip {
+  font-size: 11px;
+  color: #3B82F6;
+  font-weight: 600;
+}
+
+.dsi-area {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* GPS Status */
+.gps-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--success-bg);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: #065F46;
+  margin: 0 16px 12px;
+}
+
+.gps-status.off {
+  background: var(--warning-bg);
+  color: #92400E;
+}
+
+.gps-pulse {
+  width: 8px;
+  height: 8px;
+  background: var(--success);
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.gps-pulse.off {
+  background: var(--warning);
+  animation: none;
+}
+
+/* POI Markers (Local Landmarks) */
+.poi-marker-wrapper { background: none !important; border: none !important; }
+.poi-marker {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  background: rgba(255,255,255,0.9);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  position: relative;
+  transition: all 0.3s;
+}
+.poi-marker.hot {
+  background: #FEF3C7;
+  box-shadow: 0 2px 12px rgba(245,158,11,0.4);
+  animation: pulse 2s ease infinite;
+}
+.poi-hot {
+  position: absolute;
+  top: -6px; right: -6px;
+  font-size: 14px;
+  animation: pulse 1s ease infinite;
+}
+
+/* Alert Info */
+.alert-info {
+  background: var(--info-bg);
+  color: #1E40AF;
+}
+
+```
+
+## File: `main.js`
+
+```javascript
 /* ========================================
    🟣 TÍM GO v2.0 — Professional Edition
    Hệ thống quản lý tài xế chuyên nghiệp
@@ -14,14 +2092,19 @@ import {
 // ============================================================
 // DATA STORE
 // ============================================================
-const STORAGE_KEY = 'timgo_v5_data';
+const STORAGE_KEY = 'timgo_v2_data';
 const DB_ONLINE = initSupabase();
 
 function getDefaultData() {
   const today = new Date().toISOString().split('T')[0];
   return {
     users: [
-      { id: 'admin1', name: 'Tâm Thịnh', phone: '0948505077', password: 'Tamthinh123', role: 'admin', status: 'active', created_at: today },
+      { id: 'admin1', name: 'Admin Tím Go', phone: '0948505077', password: 'Tamthinh123', role: 'admin', status: 'active', created_at: today },
+      { id: 'd1', name: 'Nguyễn Văn An', phone: '0911111111', password: '111111', role: 'driver', vehicle_plate: '59P1-12345', vehicle_type: 'xe_may', status: 'active', commission_type: 'percent', commission_value: 20, online: true, wallet: 500000, created_at: today },
+      { id: 'd2', name: 'Trần Minh Bảo', phone: '0922222222', password: '222222', role: 'driver', vehicle_plate: '59P1-67890', vehicle_type: 'xe_may', status: 'active', commission_type: 'percent', commission_value: 20, online: true, wallet: 320000, created_at: today },
+      { id: 'd3', name: 'Lê Hoàng Cường', phone: '0933333333', password: '333333', role: 'driver', vehicle_plate: '59P1-11111', vehicle_type: 'xe_may', status: 'active', commission_type: 'percent', commission_value: 20, online: false, wallet: 180000, created_at: today },
+      { id: 'd4', name: 'Phạm Thanh Dũng', phone: '0944444444', password: '444444', role: 'driver', vehicle_plate: '59P2-22222', vehicle_type: 'xe_may', status: 'active', commission_type: 'percent', commission_value: 20, online: true, wallet: 760000, created_at: today },
+      { id: 'd5', name: 'Võ Quốc Em', phone: '0955555555', password: '555555', role: 'driver', vehicle_plate: '59P2-33333', vehicle_type: 'xe_may', status: 'active', commission_type: 'percent', commission_value: 15, online: true, wallet: 420000, created_at: today },
     ],
     trips: [],
     pricing: {
@@ -45,18 +2128,8 @@ function getDefaultData() {
       surge_hours: { start: 7, end: 9, start2: 17, end2: 19 },
       night_hours: { start: 22, end: 5 },
     },
-    settings: {
-      default_commission_type: 'percent', default_commission_value: 20, calc_method: 'km',
-      fund: {
-        purpose: 'Bảo trì xe + hỗ trợ tài xế',
-        per_trip: { enabled: true, amount: 2000 },
-        per_day: { enabled: false, amount: 10000, absent_policy: 'skip' },
-        percent: { enabled: true, value: 5 },
-      },
-    },
+    settings: { default_commission_type: 'percent', default_commission_value: 20, calc_method: 'km', googleMapKey: '' },
     walletHistory: [],
-    fundTransactions: [],
-    fundExpenses: [],
     debts: [],
     invoices: [],
     activityLog: [],
@@ -75,11 +2148,7 @@ function loadData() {
       if (!d.invoices) d.invoices = [];
       if (!d.activityLog) d.activityLog = [];
       if (!d.shifts) d.shifts = [];
-      if (!d.fundTransactions) d.fundTransactions = [];
-      if (!d.fundExpenses) d.fundExpenses = [];
       if (!d.pricing) d.pricing = getDefaultData().pricing;
-      if (!d.settings) d.settings = getDefaultData().settings;
-      if (!d.settings.fund) d.settings.fund = getDefaultData().settings.fund;
       return d;
     }
   } catch (e) {}
@@ -333,15 +2402,16 @@ function updateGPSStatus(active, data) {
 // Initialize Leaflet map for Admin
 function initAdminMap() {
   const mapEl = document.getElementById('admin-map');
-  if (!mapEl || !window.L) return;
-  if (adminMap) { adminMap.remove(); adminMap = null; }
+  if (!mapEl || !window.google) return;
+  if (adminMap) { adminMap = null; }
   
-  adminMap = L.map('admin-map', { zoomControl: false, attributionControl: false }).setView([10.7769, 106.7009], 12);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-    attribution: '© OpenStreetMap'
-  }).addTo(adminMap);
-  L.control.zoom({ position: 'topright' }).addTo(adminMap);
+  adminMap = new window.google.maps.Map(document.getElementById('admin-map'), {
+    center: {lat: 10.7769, lng: 106.7009},
+    zoom: 12,
+    disableDefaultUI: true,
+    zoomControl: true,
+    mapId: 'DEMO_MAP_ID'
+  });
   
   updateAdminMapMarkers();
   updateDriverStatusList();
@@ -364,17 +2434,13 @@ function updateAdminMapMarkers() {
     const speed = pos.speed || 0;
     
     // Enhanced marker with status ring
-    const icon = L.divIcon({
-      className: 'driver-marker-wrapper',
-      html: `<div class="driver-marker-pro" style="--marker-color:${color}">
-        <div class="marker-dot ${status === 'busy' ? 'moving' : ''}"></div>
-        <div class="marker-name">${shortName}</div>
-        ${status === 'busy' ? '<div class="marker-speed">'+speed+'km/h</div>' : ''}
-      </div>`,
-      iconSize: [90, 50],
-      iconAnchor: [45, 25]
-    });
-    
+    const el = document.createElement('div');
+    el.className = 'driver-marker-wrapper';
+    el.innerHTML = `<div class="driver-marker-pro" style="--marker-color:${color}">
+      <div class="marker-dot ${status === 'busy' ? 'moving' : ''}"></div>
+      <div class="marker-name">${shortName}</div>
+      ${status === 'busy' ? '<div class="marker-speed">'+speed+'km/h</div>' : ''}
+    </div>`;
     // Rich popup
     const elapsed = busyInfo ? Math.round((Date.now() - busyInfo.startTime) / 60000) : 0;
     const popupHtml = `<div style="font-family:Inter,sans-serif;min-width:180px;">
@@ -391,11 +2457,25 @@ function updateAdminMapMarkers() {
     </div>`;
     
     if (driverMarkers[d.id]) {
-      driverMarkers[d.id].setLatLng([pos.lat, pos.lng]).setIcon(icon);
-      driverMarkers[d.id].setPopupContent(popupHtml);
+      driverMarkers[d.id].position = { lat: pos.lat, lng: pos.lng };
+      driverMarkers[d.id].content.innerHTML = `<div class="driver-marker-pro" style="--marker-color:${color}">
+        <div class="marker-dot ${status === 'busy' ? 'moving' : ''}"></div>
+        <div class="marker-name">${shortName}</div>
+        ${status === 'busy' ? '<div class="marker-speed">'+speed+'km/h</div>' : ''}
+      </div>`;
     } else {
-      driverMarkers[d.id] = L.marker([pos.lat, pos.lng], { icon }).addTo(adminMap);
-      driverMarkers[d.id].bindPopup(popupHtml);
+      driverMarkers[d.id] = new google.maps.marker.AdvancedMarkerElement({
+        map: adminMap,
+        position: { lat: pos.lat, lng: pos.lng },
+        content: el
+      });
+      const infoWindow = new google.maps.InfoWindow({ content: popupHtml });
+      driverMarkers[d.id].addListener('click', () => {
+        infoWindow.open({
+          anchor: driverMarkers[d.id],
+          map: adminMap,
+        });
+      });
     }
   });
 }
@@ -447,36 +2527,42 @@ function updateDriverStatusList() {
 
 // OSRM: Tính km theo đường đi THỰC TẾ (không phải chim bay)
 async function osrmDistance(lat1, lng1, lat2, lng2) {
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.code === 'Ok' && data.routes?.[0]) {
-      return {
-        km: Math.round(data.routes[0].distance / 100) / 10, // mét → km (1 chữ số)
-        duration_min: Math.round(data.routes[0].duration / 60),
-        raw_meters: data.routes[0].distance,
-      };
-    }
-  } catch (e) { console.warn('OSRM error:', e); }
-  // Fallback: dùng Haversine nếu OSRM lỗi
-  return { km: Math.round(haversine(lat1, lng1, lat2, lng2) * 10) / 10, duration_min: 0, raw_meters: 0, fallback: true };
+  if (!window.google) return { km: Math.round(haversine(lat1, lng1, lat2, lng2) * 1.4 * 10) / 10, duration_min: 0, raw_meters: 0, fallback: true };
+  const service = new google.maps.DistanceMatrixService();
+  return new Promise((resolve) => {
+    service.getDistanceMatrix({
+      origins: [{lat: lat1, lng: lng1}],
+      destinations: [{lat: lat2, lng: lng2}],
+      travelMode: 'DRIVING'
+    }, (res, status) => {
+      if (status === 'OK' && res.rows[0]?.elements[0]?.status === 'OK') {
+        const el = res.rows[0].elements[0];
+        resolve({
+          km: Math.round(el.distance.value / 100) / 10,
+          duration_min: Math.round(el.duration.value / 60),
+          raw_meters: el.distance.value
+        });
+      } else resolve({ km: Math.round(haversine(lat1, lng1, lat2, lng2) * 1.4 * 10) / 10, duration_min: 0, raw_meters: 0, fallback: true });
+    });
+  });
 }
 
 // Nominatim: GPS → Địa chỉ tự động (FREE)
 async function reverseGeocode(lat, lng) {
-  try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=18&addressdetails=1`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'TimGo/2.0' } });
-    const data = await res.json();
-    if (data.display_name) {
-      const a = data.address || {};
-      // Trả về địa chỉ ngắn gọn kiểu VN
-      const short = [a.road, a.suburb || a.quarter, a.city_district || a.county].filter(Boolean).join(', ');
-      return short || data.display_name.split(',').slice(0, 3).join(',');
-    }
-  } catch (e) { console.warn('Nominatim error:', e); }
-  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  if (!window.google) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  const geocoder = new google.maps.Geocoder();
+  return new Promise((resolve) => {
+    geocoder.geocode({ location: { lat, lng } }, (res, status) => {
+      if (status === 'OK' && res[0]) {
+        // Find a concise formatted address
+        let short = res[0].formatted_address;
+        const parts = short.split(', ');
+        if (parts.length > 3) short = parts.slice(0, 3).join(', ');
+        resolve(short);
+      }
+      else resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    });
+  });
 }
 
 // Lấy vị trí hiện tại (Promise-based)
@@ -542,49 +2628,21 @@ function renderLogin() {
       <div class="login-subtitle">Quản lý tài xế chuyên nghiệp</div>
       <div class="login-card">
         <div class="login-role-tabs">
-          <button class="role-tab active" id="tab-login" onclick="G.switchAuthTab('login')">🔑 Đăng nhập</button>
-          <button class="role-tab" id="tab-register" onclick="G.switchAuthTab('register')">📝 Đăng ký TX</button>
+          <button class="role-tab active" id="rt-admin" onclick="G.setRole('admin')">🔑 Admin</button>
+          <button class="role-tab" id="rt-driver" onclick="G.setRole('driver')">🏍️ Tài xế</button>
         </div>
-
-        <div id="form-login">
-          <div class="form-group">
-            <label class="form-label">Số điện thoại</label>
-            <input type="tel" class="form-input" id="inp-phone" placeholder="VD: 0948505077" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Mật khẩu</label>
-            <input type="password" class="form-input" id="inp-pass" placeholder="Nhập mật khẩu" />
-          </div>
-          <div id="login-err" class="alert alert-danger" style="display:none"></div>
-          <button class="btn btn-primary" onclick="G.login()">Đăng nhập</button>
-          <div class="text-center text-muted" style="margin-top:16px;font-size:11px;">
-            Tài xế mới? Bấm tab <b>📝 Đăng ký TX</b> bên trên
-          </div>
+        <div class="form-group">
+          <label class="form-label">Số điện thoại</label>
+          <input type="tel" class="form-input" id="inp-phone" placeholder="Số điện thoại" />
         </div>
-
-        <div id="form-register" style="display:none;">
-          <div class="form-group">
-            <label class="form-label">Số điện thoại *</label>
-            <input type="tel" class="form-input" id="reg-phone" placeholder="0xxx..." inputmode="numeric" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Họ tên *</label>
-            <input type="text" class="form-input" id="reg-name" placeholder="Nguyễn Văn..." />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Mật khẩu *</label>
-            <input type="password" class="form-input" id="reg-pass" placeholder="Tối thiểu 6 ký tự" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Biển số xe</label>
-            <input type="text" class="form-input" id="reg-plate" placeholder="VD: 59P1-12345" />
-          </div>
-          <div id="reg-err" class="alert alert-danger" style="display:none"></div>
-          <div id="reg-ok" class="alert alert-success" style="display:none"></div>
-          <button class="btn btn-primary" onclick="G.register()">📝 Gửi đăng ký</button>
-          <div class="text-center text-muted" style="margin-top:12px;font-size:11px;">
-            Sau khi đăng ký, admin sẽ duyệt tài khoản trước khi anh có thể chạy đơn.
-          </div>
+        <div class="form-group">
+          <label class="form-label">Mật khẩu</label>
+          <input type="password" class="form-input" id="inp-pass" placeholder="Nhập mật khẩu" />
+        </div>
+        <div id="login-err" class="alert alert-danger" style="display:none"></div>
+        <button class="btn btn-primary" onclick="G.login()">Đăng nhập</button>
+        <div class="text-center text-muted" style="margin-top:16px;font-size:11px;">
+          © 2026 Tím Go — Phước Long, Bạc Liêu
         </div>
       </div>
     </div>`;
@@ -597,7 +2655,7 @@ function renderAdmin() {
   stopDriverGPS();
   app().innerHTML = [
     adminDashboard(), adminDrivers(), adminTrips(), adminFinance(),
-    adminPricing(), adminDebts(), adminQuyConfig(), adminQuyReport(), adminSettings(),
+    adminPricing(), adminDebts(), adminSettings(),
     `<div class="modal-overlay" id="modal-ov" onclick="G.closeModal()"><div class="modal-sheet" onclick="event.stopPropagation()" id="modal-c"></div></div>`,
     adminNav()
   ].join('');
@@ -672,24 +2730,10 @@ function tripCard(t, showDriver) {
 
 function adminDrivers() {
   const drivers = D.users.filter(u => u.role === 'driver');
-  const pending = drivers.filter(d => d.status === 'pending');
-  const active = drivers.filter(d => d.status === 'active');
-  const blocked = drivers.filter(d => d.status === 'blocked');
   return `<div class="screen" id="scr-a-drivers">
-    <div class="header"><div class="header-top"><div><div class="header-name">👤 Quản lý tài xế</div><div class="header-date">${pending.length>0?'🟡 '+pending.length+' chờ duyệt · ':''}${active.length} hoạt động · ${blocked.length} khóa</div></div><div class="header-badge" onclick="G.addDriverModal()">➕</div></div></div>
-    ${pending.length > 0 ? `
+    <div class="header"><div class="header-top"><div><div class="header-name">👤 Quản lý tài xế</div><div class="header-date">${drivers.filter(d=>d.status==='active').length} hoạt động · ${drivers.length} tổng</div></div><div class="header-badge" onclick="G.addDriverModal()">➕</div></div></div>
     <div class="section" style="margin-top:16px;">
-      <div class="section-title mb-8" style="color:var(--warning);">⏳ Chờ duyệt (${pending.length})</div>
-      ${pending.map(d => `<div class="driver-card" style="border-left:3px solid var(--warning);" onclick="G.driverDetail('${d.id}')">
-        <div class="driver-top">
-          <div class="driver-avatar" style="background:var(--warning);color:#fff;">⏳</div>
-          <div><div class="driver-name">${d.name}</div><div class="driver-plate">📞 ${d.phone} · 🏍️ ${d.vehicle_plate||'Chưa có'}</div></div>
-          <button class="btn btn-sm btn-success" onclick="event.stopPropagation();G.approveDriver('${d.id}')" style="padding:6px 14px;">✅ Duyệt</button>
-        </div>
-      </div>`).join('')}
-    </div>` : ''}
-    <div class="section" style="margin-top:16px;">
-    ${drivers.filter(d => d.status !== 'pending').map(d => {
+    ${drivers.map(d => {
       const tr = todayTrips(d.id);
       const amt = tr.reduce((s,t)=>s+t.amount,0);
       const debt = tr.filter(t=>t.payment_status==='debt').reduce((s,t)=>s+t.amount,0);
@@ -857,183 +2901,12 @@ function adminDebts() {
   </div>`;
 }
 
-function getFundBalance() {
-  const inAmt = (D.fundTransactions||[]).reduce((s,t)=>s+(t.amount||0),0);
-  const outAmt = (D.fundExpenses||[]).reduce((s,e)=>s+(e.amount||0),0);
-  return inAmt - outAmt;
-}
-
-function adminQuyConfig() {
-  const f = (D.settings.fund) || { per_trip:{enabled:false,amount:0}, per_day:{enabled:false,amount:0,absent_policy:'skip'}, percent:{enabled:false,value:0}, purpose:'' };
-  const tripAmts = [500, 1000, 2000, 3000, 5000];
-  const dayAmts = [5000, 10000, 15000, 20000, 30000];
-  const pctVals = [1, 3, 5, 7, 10, 15];
-
-  const sampleTrips = 30, sampleAmount = 30000;
-  const sampleComm = sampleAmount * 0.2;
-  let inFund = 0; const inDriver = sampleAmount * sampleTrips;
-  if (f.per_trip.enabled) inFund += f.per_trip.amount * sampleTrips;
-  if (f.percent.enabled) inFund += sampleComm * sampleTrips * f.percent.value / 100;
-  if (f.per_day.enabled) inFund += f.per_day.amount;
-  const driverNet = inDriver - inFund;
-
-  const radioPick = (group, vals, selected) => vals.map(v =>
-    `<label style="display:inline-block;padding:6px 12px;margin:4px;border-radius:8px;background:${selected===v?'var(--primary)':'var(--bg-card)'};color:${selected===v?'#fff':'var(--text)'};cursor:pointer;font-weight:600;border:1px solid var(--border);">
-      <input type="radio" name="quy-${group}" value="${v}" ${selected===v?'checked':''} style="display:none" onchange="G.previewQuy()" /> ${fmt(v)}${group==='pct'?'%':'đ'}
-    </label>`).join('');
-
-  return `<div class="screen" id="scr-a-quy-config">
-    <div class="header"><div class="header-top"><div><div class="header-name">⚙️ Cài đặt quỹ</div><div class="header-date">Quỹ hiện: ${fmt(getFundBalance())}đ</div></div></div></div>
-
-    <div class="section" style="margin-top:16px;">
-      <div class="stat-card" style="opacity:1;text-align:left;padding:16px;">
-        <label class="form-label">Mục đích quỹ</label>
-        <input type="text" class="form-input" id="quy-purpose" value="${(f.purpose||'').replace(/"/g,'&quot;')}" placeholder="VD: Bảo trì xe + hỗ trợ anh em" />
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title mb-8">📋 Phương thức đóng quỹ (chọn 1 hoặc nhiều)</div>
-
-      <div class="stat-card" style="opacity:1;text-align:left;padding:16px;margin-bottom:12px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-          <input type="checkbox" id="quy-trip-en" ${f.per_trip.enabled?'checked':''} onchange="G.previewQuy()" style="width:20px;height:20px;" />
-          <label for="quy-trip-en" style="font-weight:700;">Đóng theo CUỐC (cố định)</label>
-        </div>
-        <div style="margin-left:30px;">
-          <div style="margin-bottom:6px;color:var(--text-muted);font-size:13px;">Mỗi cuốc trừ:</div>
-          <div>${radioPick('trip', tripAmts, f.per_trip.amount)}</div>
-          <input type="number" class="form-input" id="quy-trip-custom" placeholder="Tự nhập (đ)" value="${tripAmts.includes(f.per_trip.amount)?'':f.per_trip.amount||''}" oninput="G.previewQuy()" style="margin-top:8px;" />
-        </div>
-      </div>
-
-      <div class="stat-card" style="opacity:1;text-align:left;padding:16px;margin-bottom:12px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-          <input type="checkbox" id="quy-day-en" ${f.per_day.enabled?'checked':''} onchange="G.previewQuy()" style="width:20px;height:20px;" />
-          <label for="quy-day-en" style="font-weight:700;">Đóng theo NGÀY (cố định)</label>
-        </div>
-        <div style="margin-left:30px;">
-          <div style="margin-bottom:6px;color:var(--text-muted);font-size:13px;">Mỗi ngày trừ:</div>
-          <div>${radioPick('day', dayAmts, f.per_day.amount)}</div>
-          <input type="number" class="form-input" id="quy-day-custom" placeholder="Tự nhập (đ)" value="${dayAmts.includes(f.per_day.amount)?'':f.per_day.amount||''}" oninput="G.previewQuy()" style="margin-top:8px;" />
-          <div style="margin-top:10px;">
-            <div style="font-size:13px;margin-bottom:4px;">Khi tài xế nghỉ:</div>
-            <label style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;"><input type="radio" name="quy-absent" value="skip" ${f.per_day.absent_policy==='skip'?'checked':''} /> Không thu (công bằng)</label>
-            <label style="display:inline-flex;align-items:center;gap:6px;"><input type="radio" name="quy-absent" value="bu" ${f.per_day.absent_policy==='bu'?'checked':''} /> Bù vào ngày sau</label>
-          </div>
-        </div>
-      </div>
-
-      <div class="stat-card" style="opacity:1;text-align:left;padding:16px;margin-bottom:12px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-          <input type="checkbox" id="quy-pct-en" ${f.percent.enabled?'checked':''} onchange="G.previewQuy()" style="width:20px;height:20px;" />
-          <label for="quy-pct-en" style="font-weight:700;">Đóng theo PHẦN TRĂM commission</label>
-        </div>
-        <div style="margin-left:30px;">
-          <div style="margin-bottom:6px;color:var(--text-muted);font-size:13px;">Lấy % từ hoa hồng:</div>
-          <div>${radioPick('pct', pctVals, f.percent.value)}</div>
-          <input type="number" class="form-input" id="quy-pct-custom" placeholder="Tự nhập (%)" value="${pctVals.includes(f.percent.value)?'':f.percent.value||''}" oninput="G.previewQuy()" style="margin-top:8px;" />
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title mb-8">👁️ Xem trước tác động</div>
-      <div id="quy-preview" class="stat-card" style="opacity:1;text-align:left;padding:16px;background:var(--bg-secondary);">
-        <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Ví dụ: tài xế chạy ${sampleTrips} cuốc, mỗi cuốc ${fmt(sampleAmount)}đ:</div>
-        <div class="summary-row"><span class="label">💰 Doanh thu</span><span class="value">${fmt(inDriver)}đ</span></div>
-        <div class="summary-row"><span class="label">🟣 Vào quỹ</span><span class="value text-primary fw-bold">${fmt(inFund)}đ</span></div>
-        <div class="summary-row"><span class="label">💵 Tài xế nhận</span><span class="value text-success fw-bold">${fmt(driverNet)}đ</span></div>
-      </div>
-    </div>
-
-    <div class="section">
-      <button class="btn btn-primary" onclick="G.saveQuyConfig()">💾 Lưu cài đặt quỹ</button>
-      <button class="btn btn-outline mt-8" onclick="G.showA('scr-a-settings')">← Quay lại</button>
-    </div>
-  </div>`;
-}
-
-function adminQuyReport() {
-  const balance = getFundBalance();
-  const tx = D.fundTransactions || [];
-  const ex = D.fundExpenses || [];
-  const tdy = today();
-  const ym = tdy.substring(0,7);
-  const txMonth = tx.filter(t => (t.date||'').startsWith(ym));
-  const exMonth = ex.filter(e => (e.date||'').startsWith(ym));
-  const txToday = tx.filter(t => t.date === tdy);
-  const exToday = ex.filter(e => e.date === tdy);
-  const sumIn = arr => arr.reduce((s,t)=>s+(t.amount||0),0);
-  const inToday = sumIn(txToday), inMonth = sumIn(txMonth);
-  const outToday = sumIn(exToday), outMonth = sumIn(exMonth);
-  const drvAgg = {};
-  txMonth.forEach(t => {
-    if (!t.driver_id) return;
-    if (!drvAgg[t.driver_id]) drvAgg[t.driver_id] = { count:0, amount:0 };
-    drvAgg[t.driver_id].count++; drvAgg[t.driver_id].amount += t.amount;
-  });
-  const drvList = Object.entries(drvAgg).map(([did,v]) => ({ name: driverName(did), ...v })).sort((a,b)=>b.amount-a.amount);
-
-  return `<div class="screen" id="scr-a-quy-report">
-    <div class="header"><div class="header-top"><div><div class="header-name">🟣 Báo cáo quỹ</div><div class="header-date">Cập nhật: ${vnDate()}</div></div></div></div>
-
-    <div class="section" style="margin-top:16px;">
-      <div class="stat-card" style="opacity:1;text-align:left;padding:20px;background:linear-gradient(135deg,#7C3AED,#A855F7);color:#fff;">
-        <div style="font-size:13px;opacity:0.9;">QUỸ HIỆN TẠI</div>
-        <div style="font-size:32px;font-weight:800;margin:8px 0;">${fmtFull(balance)}</div>
-        <div style="font-size:12px;opacity:0.85;">${(D.settings.fund?.purpose)||'Quỹ chung'}</div>
-      </div>
-    </div>
-
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-icon">⬆️</div><div class="stat-value text-success">${fmt(inToday)}</div><div class="stat-label">Thu hôm nay</div></div>
-      <div class="stat-card"><div class="stat-icon">⬇️</div><div class="stat-value text-warning">${fmt(outToday)}</div><div class="stat-label">Chi hôm nay</div></div>
-      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value">${fmt(inMonth)}</div><div class="stat-label">Thu tháng này</div></div>
-      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value text-warning">${fmt(outMonth)}</div><div class="stat-label">Chi tháng này</div></div>
-    </div>
-
-    <div class="section">
-      <div class="section-header"><div class="section-title">💸 Chi tiêu quỹ</div><button class="btn btn-sm btn-success" onclick="G.addFundExpenseModal()">➕ Thêm chi</button></div>
-      ${exMonth.length === 0 ? '<div class="alert alert-info">Chưa có khoản chi nào tháng này</div>' :
-        exMonth.slice(0,10).map(e => `<div class="trip-card">
-          <div class="trip-header"><span class="trip-number">🔧 ${e.note||'Chi quỹ'}</span><span class="trip-time">${e.date}</span></div>
-          <div class="trip-amount text-warning">-${fmtFull(e.amount)}</div>
-          ${e.target ? `<div class="trip-note">👤 Cho: ${e.target}</div>` : ''}
-        </div>`).join('')}
-    </div>
-
-    <div class="section">
-      <div class="section-title mb-8">👥 Đóng góp tháng (theo tài xế)</div>
-      ${drvList.length === 0 ? '<div class="alert alert-info">Chưa có đóng góp tháng này</div>' :
-        drvList.map(d => `<div class="trip-card">
-          <div class="trip-header"><span class="trip-number">👤 ${d.name}</span><span class="trip-time">${d.count} cuốc</span></div>
-          <div class="trip-amount text-primary">${fmtFull(d.amount)}</div>
-        </div>`).join('')}
-    </div>
-
-    <div class="section">
-      <div class="section-title mb-8">📋 Lịch sử thu gần nhất</div>
-      ${txMonth.slice(-10).reverse().map(t => `<div class="trip-card">
-        <div class="trip-header"><span class="trip-number">${driverName(t.driver_id)} · ${t.source||'cuốc'}</span><span class="trip-time">${t.date}</span></div>
-        <div class="trip-amount text-success">+${fmtFull(t.amount)}</div>
-      </div>`).join('')}
-    </div>
-
-    <div class="section">
-      <button class="btn btn-outline mt-8" onclick="G.showA('scr-a-settings')">← Quay lại</button>
-    </div>
-  </div>`;
-}
-
 function adminSettings() {
   return `<div class="screen" id="scr-a-settings">
     <div class="header"><div class="header-top"><div><div class="header-name">⚙️ Cài đặt & Thêm</div></div></div></div>
     <div class="section" style="margin-top:16px;">
       <div class="section-title mb-8">📱 Menu</div>
       <div class="driver-card" onclick="G.showA('scr-a-pricing')" style="cursor:pointer"><div class="driver-top"><div class="driver-avatar" style="font-size:24px">🧮</div><div><div class="driver-name">Bảng giá dịch vụ</div><div class="driver-plate">Cài đặt giá theo km, tuyến, giờ</div></div></div></div>
-      <div class="driver-card" onclick="G.showA('scr-a-quy-config')" style="cursor:pointer;border-left:3px solid #7C3AED;"><div class="driver-top"><div class="driver-avatar" style="font-size:24px;background:#7C3AED;color:#fff;">🟣</div><div><div class="driver-name">Cài đặt quỹ</div><div class="driver-plate">${D.settings.fund?.per_trip?.enabled?'☑Cuốc ':''}${D.settings.fund?.per_day?.enabled?'☑Ngày ':''}${D.settings.fund?.percent?.enabled?'☑%':''} · ${(D.settings.fund?.purpose||'Chưa cài')}</div></div></div></div>
-      <div class="driver-card" onclick="G.showA('scr-a-quy-report')" style="cursor:pointer;border-left:3px solid #10B981;"><div class="driver-top"><div class="driver-avatar" style="font-size:24px;background:#10B981;color:#fff;">📊</div><div><div class="driver-name">Báo cáo quỹ</div><div class="driver-plate">Hiện có: ${fmt(getFundBalance())}đ</div></div></div></div>
       <div class="driver-card" onclick="G.showA('scr-a-debts')" style="cursor:pointer"><div class="driver-top"><div class="driver-avatar" style="font-size:24px">⚠️</div><div><div class="driver-name">Quản lý công nợ</div><div class="driver-plate">${D.debts.filter(d=>d.status==='pending').length} khoản chưa thu</div></div></div></div>
       <div class="driver-card" style="cursor:pointer"><div class="driver-top"><div class="driver-avatar" style="font-size:24px">📊</div><div><div class="driver-name">Nhật ký hoạt động</div><div class="driver-plate">${D.activityLog.length} bản ghi</div></div></div></div>
     </div>
@@ -1231,67 +3104,7 @@ function openModal(html) { $('modal-c').innerHTML = html; $('modal-ov').classLis
 window.G = {
   setRole(r) {
     document.querySelectorAll('.role-tab').forEach(t=>t.classList.remove('active'));
-    const el = $(`rt-${r}`);
-    if (el) el.classList.add('active');
-  },
-
-  switchAuthTab(tab) {
-    document.querySelectorAll('.role-tab').forEach(t=>t.classList.remove('active'));
-    $(`tab-${tab}`).classList.add('active');
-    $('form-login').style.display = tab === 'login' ? 'block' : 'none';
-    $('form-register').style.display = tab === 'register' ? 'block' : 'none';
-  },
-
-  async register() {
-    const phone = $('reg-phone').value.trim();
-    const name = $('reg-name').value.trim();
-    const pass = $('reg-pass').value;
-    const plate = $('reg-plate').value.trim();
-    const errEl = $('reg-err');
-    const okEl = $('reg-ok');
-    const showErr = msg => { errEl.textContent = msg; errEl.style.display = 'flex'; okEl.style.display = 'none'; };
-
-    if (!phone || !name || !pass) { showErr('❌ Vui lòng nhập SĐT, họ tên và mật khẩu'); return; }
-    if (!/^0\d{9,10}$/.test(phone)) { showErr('❌ SĐT không hợp lệ (bắt đầu bằng 0, 10-11 số)'); return; }
-    if (pass.length < 6) { showErr('❌ Mật khẩu tối thiểu 6 ký tự'); return; }
-
-    // Check phone uniqueness — load latest cloud data first if online (3s timeout)
-    if (DB_ONLINE) {
-      try {
-        const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
-        const cloud = await withTimeout(loadDataFromCloud(), 3000);
-        if (cloud) D = cloud;
-      } catch (e) { /* fallback to local */ }
-    }
-    if (D.users.find(u => u.phone === phone)) {
-      showErr('❌ SĐT này đã được đăng ký');
-      return;
-    }
-
-    const pw_hash = await hashPassword(pass);
-    const newDriver = {
-      id: 'd' + Date.now(),
-      name, phone, password: pass, password_hash: pw_hash,
-      role: 'driver',
-      vehicle_plate: plate, vehicle_type: 'xe_may',
-      status: 'pending',
-      commission_type: 'percent',
-      commission_value: D.settings?.default_commission_value || 20,
-      online: false, wallet: 0,
-      created_at: today(),
-    };
-    D.users.push(newDriver);
-    addLog('driver_register', `Đăng ký mới: ${name} (${phone})`);
-    saveData(D);
-    if (DB_ONLINE) dbSaveUser(newDriver).catch(e => console.error('Register sync:', e));
-
-    errEl.style.display = 'none';
-    okEl.innerHTML = `✅ Đăng ký thành công!<br>Tài khoản đang <b>chờ admin duyệt</b>. Anh sẽ được thông báo khi tài khoản kích hoạt.`;
-    okEl.style.display = 'flex';
-    $('reg-phone').value = '';
-    $('reg-name').value = '';
-    $('reg-pass').value = '';
-    $('reg-plate').value = '';
+    $(`rt-${r}`).classList.add('active');
   },
   async login() {
     const phone = $('inp-phone').value.trim(), pass = $('inp-pass').value;
@@ -1302,13 +3115,10 @@ window.G = {
     if (btn) { btn.textContent = '⏳ Đang đăng nhập...'; btn.disabled = true; }
     
     try {
-      // Load cloud data first (if available, with 3s timeout)
+      // Load cloud data first (if available)
       if (DB_ONLINE) {
-        try {
-          const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
-          const cloud = await withTimeout(loadDataFromCloud(), 3000);
-          if (cloud) { D = cloud; }
-        } catch (e) { console.warn('Cloud load skipped:', e?.message || e); }
+        const cloud = await loadDataFromCloud();
+        if (cloud) { D = cloud; }
       }
       
       // Find user by phone
@@ -1342,12 +3152,6 @@ window.G = {
       
       if (user.status === 'blocked') {
         $('login-err').textContent = '🔒 Tài khoản đã bị khóa!';
-        $('login-err').style.display = 'flex';
-        if (btn) { btn.textContent = '🚀 Đăng nhập'; btn.disabled = false; }
-        return;
-      }
-      if (user.status === 'pending') {
-        $('login-err').textContent = '⏳ Tài khoản đang chờ admin duyệt!';
         $('login-err').style.display = 'flex';
         if (btn) { btn.textContent = '🚀 Đăng nhập'; btn.disabled = false; }
         return;
@@ -1704,23 +3508,6 @@ window.G = {
     };
     D.trips.push(trip);
 
-    // Fund contribution (auto-deduct theo cài đặt)
-    const fundCfg = D.settings.fund || {};
-    let fundContrib = 0;
-    if (fundCfg.per_trip?.enabled) fundContrib += fundCfg.per_trip.amount || 0;
-    if (fundCfg.percent?.enabled) fundContrib += Math.round(comm * (fundCfg.percent.value || 0) / 100);
-    if (fundContrib > 0) {
-      const ftx = {
-        id: 'ftx' + Date.now(), trip_id: tid, driver_id: U.id,
-        amount: fundContrib, source: 'cuoc', note: 'Cuốc #' + num,
-        date: today(), created_at: now.toISOString(),
-      };
-      if (!D.fundTransactions) D.fundTransactions = [];
-      D.fundTransactions.push(ftx);
-      const drv = D.users.find(u => u.id === U.id);
-      if (drv) drv.wallet = (drv.wallet || 0) - fundContrib;
-    }
-
     // Create invoice
     const invoice = { id: 'inv'+Date.now(), trip_id: tid, driver_id: U.id, amount: amt, service_type: svc, distance_km: km, commission: comm, payment_status: payStatus, payment_method: payMethod, created_at: now.toISOString(), date: today() };
     D.invoices.push(invoice);
@@ -1791,47 +3578,9 @@ window.G = {
         <div class="summary-row"><span class="label">Hoa hồng</span><span class="value text-primary fw-bold">${fmtFull(comm)}</span></div>
         <div class="summary-row"><span class="label">Nợ</span><span class="value ${debt>0?'text-warning':'text-success'} fw-bold">${fmtFull(debt)}</span></div>
       </div>
-      ${d.status==='pending' ? `<button class="btn btn-success" onclick="G.approveDriver('${d.id}')">✅ Duyệt tài khoản</button>` : ''}
-      ${d.status==='active'?`<button class="btn btn-danger mt-8" onclick="G.toggleBlock('${d.id}',true)">🔒 Khóa</button>`:''}
-      ${d.status==='blocked'?`<button class="btn btn-success mt-8" onclick="G.toggleBlock('${d.id}',false)">🔓 Mở khóa</button>`:''}
-      <button class="btn btn-outline mt-8" onclick="G.editDriverName('${d.id}')">✏️ Đổi tên</button>
-      <button class="btn btn-outline mt-8" onclick="G.deleteDriver('${d.id}')" style="color:var(--danger);border-color:var(--danger);">🗑️ Xóa tài khoản</button>
+      ${d.status==='active'?`<button class="btn btn-danger" onclick="G.toggleBlock('${d.id}',true)">🔒 Khóa</button>`:`<button class="btn btn-success" onclick="G.toggleBlock('${d.id}',false)">🔓 Mở khóa</button>`}
       <button class="btn btn-outline mt-8" onclick="G.closeModal()">Đóng</button>
     `);
-  },
-
-  approveDriver(id) {
-    const u = D.users.find(x=>x.id===id);
-    if (!u) return;
-    u.status = 'active';
-    addLog('driver_approve', `Duyệt TX: ${u.name}`);
-    saveData(D);
-    if (DB_ONLINE) dbUpdateUserField(id, 'status', 'active').catch(e => console.error('Approve sync:', e));
-    G.closeModal(); renderAdmin(); G.showA('scr-a-drivers');
-    alert('✅ Đã duyệt ' + u.name);
-  },
-
-  deleteDriver(id) {
-    const u = D.users.find(x=>x.id===id);
-    if (!u) return;
-    if (!confirm(`🗑️ Xóa hẳn tài khoản "${u.name}"?\n\nCảnh báo: KHÔNG khôi phục lại được.`)) return;
-    D.users = D.users.filter(x => x.id !== id);
-    addLog('driver_delete', `Xóa TX: ${u.name} (${u.phone})`);
-    saveData(D);
-    // TODO: dbDeleteUser if exists
-    G.closeModal(); renderAdmin(); G.showA('scr-a-drivers');
-  },
-
-  editDriverName(id) {
-    const u = D.users.find(x=>x.id===id);
-    if (!u) return;
-    const newName = prompt('Đổi tên tài xế:', u.name);
-    if (!newName || newName.trim() === '' || newName === u.name) return;
-    u.name = newName.trim();
-    addLog('driver_rename', `Đổi tên: ${u.phone} → ${u.name}`);
-    saveData(D);
-    if (DB_ONLINE) dbUpdateUserField(id, 'name', u.name).catch(e => console.error('Rename sync:', e));
-    G.closeModal(); renderAdmin(); G.showA('scr-a-drivers');
   },
 
   toggleBlock(id, block) {
@@ -2006,91 +3755,6 @@ window.G = {
 
   reset() {
     if (confirm('🔄 Reset toàn bộ?')) { localStorage.removeItem(STORAGE_KEY); D = loadData(); renderLogin(); }
-  },
-
-  // ============================================================
-  // FUND (Quỹ) HANDLERS
-  // ============================================================
-  previewQuy() {
-    const tripEn = $('quy-trip-en')?.checked;
-    const dayEn = $('quy-day-en')?.checked;
-    const pctEn = $('quy-pct-en')?.checked;
-    const tripCustom = parseInt($('quy-trip-custom')?.value);
-    const dayCustom = parseInt($('quy-day-custom')?.value);
-    const pctCustom = parseInt($('quy-pct-custom')?.value);
-    const tripRadio = parseInt(document.querySelector('input[name="quy-trip"]:checked')?.value || 0);
-    const dayRadio = parseInt(document.querySelector('input[name="quy-day"]:checked')?.value || 0);
-    const pctRadio = parseInt(document.querySelector('input[name="quy-pct"]:checked')?.value || 0);
-    const tripAmt = tripCustom || tripRadio || 0;
-    const dayAmt = dayCustom || dayRadio || 0;
-    const pctVal = pctCustom || pctRadio || 0;
-    const sampleTrips = 30, sampleAmount = 30000;
-    const sampleComm = sampleAmount * 0.2;
-    let inFund = 0;
-    if (tripEn) inFund += tripAmt * sampleTrips;
-    if (pctEn) inFund += sampleComm * sampleTrips * pctVal / 100;
-    if (dayEn) inFund += dayAmt;
-    const inDriver = sampleAmount * sampleTrips;
-    const driverNet = inDriver - inFund;
-    const preview = $('quy-preview');
-    if (preview) {
-      preview.innerHTML = `
-        <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Ví dụ: tài xế chạy ${sampleTrips} cuốc, mỗi cuốc ${fmt(sampleAmount)}đ:</div>
-        <div class="summary-row"><span class="label">💰 Doanh thu</span><span class="value">${fmt(inDriver)}đ</span></div>
-        <div class="summary-row"><span class="label">🟣 Vào quỹ</span><span class="value text-primary fw-bold">${fmt(inFund)}đ</span></div>
-        <div class="summary-row"><span class="label">💵 Tài xế nhận</span><span class="value text-success fw-bold">${fmt(driverNet)}đ</span></div>
-      `;
-    }
-  },
-
-  saveQuyConfig() {
-    const tripCustom = parseInt($('quy-trip-custom')?.value);
-    const dayCustom = parseInt($('quy-day-custom')?.value);
-    const pctCustom = parseInt($('quy-pct-custom')?.value);
-    const tripRadio = parseInt(document.querySelector('input[name="quy-trip"]:checked')?.value || 0);
-    const dayRadio = parseInt(document.querySelector('input[name="quy-day"]:checked')?.value || 0);
-    const pctRadio = parseInt(document.querySelector('input[name="quy-pct"]:checked')?.value || 0);
-    const absentPolicy = document.querySelector('input[name="quy-absent"]:checked')?.value || 'skip';
-    if (!D.settings) D.settings = {};
-    D.settings.fund = {
-      purpose: $('quy-purpose')?.value?.trim() || 'Quỹ chung',
-      per_trip: { enabled: !!$('quy-trip-en')?.checked, amount: tripCustom || tripRadio || 0 },
-      per_day: { enabled: !!$('quy-day-en')?.checked, amount: dayCustom || dayRadio || 0, absent_policy: absentPolicy },
-      percent: { enabled: !!$('quy-pct-en')?.checked, value: pctCustom || pctRadio || 0 },
-    };
-    addLog('quy_config', 'Cập nhật cài đặt quỹ');
-    saveData(D);
-    alert('✅ Đã lưu cài đặt quỹ');
-    renderAdmin(); G.showA('scr-a-quy-config');
-  },
-
-  addFundExpenseModal() {
-    const drivers = D.users.filter(u => u.role === 'driver');
-    openModal(`<div class="modal-handle"></div><div class="modal-title">💸 Thêm khoản chi quỹ</div>
-      <div class="form-group"><label class="form-label">Số tiền (đ)</label><input type="number" class="form-input" id="fex-amt" placeholder="VD: 500000" /></div>
-      <div class="form-group"><label class="form-label">Mục đích</label><input type="text" class="form-input" id="fex-note" placeholder="VD: Bảo trì xe" /></div>
-      <div class="form-group"><label class="form-label">Cho ai (tùy chọn)</label>
-        <select class="form-input" id="fex-target"><option value="">— Không chọn —</option>${drivers.map(d => `<option value="${d.name}">${d.name}</option>`).join('')}</select>
-      </div>
-      <button class="btn btn-primary" onclick="G.addFundExpense()">💾 Lưu</button>
-      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>
-    `);
-  },
-
-  addFundExpense() {
-    const amt = parseInt($('fex-amt')?.value) || 0;
-    const note = $('fex-note')?.value?.trim() || 'Chi quỹ';
-    const target = $('fex-target')?.value || '';
-    if (amt <= 0) { alert('Nhập số tiền hợp lệ'); return; }
-    const exp = {
-      id: 'fex' + Date.now(), amount: amt, note, target,
-      date: today(), created_at: new Date().toISOString(),
-    };
-    if (!D.fundExpenses) D.fundExpenses = [];
-    D.fundExpenses.push(exp);
-    addLog('fund_expense', `Chi quỹ ${fmt(amt)}đ — ${note}`);
-    saveData(D);
-    G.closeModal(); renderAdmin(); G.showA('scr-a-quy-report');
   }
 };
 
@@ -2103,15 +3767,140 @@ window.G = {
     try {
       const defaults = getDefaultData();
       generateSampleTrips(defaults);
-      // Race với timeout 5s để app không bao giờ hang nếu Supabase chậm/down
-      const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('Supabase timeout')), ms))]);
-      await withTimeout(seedDatabase(defaults), 5000);
-      const cloud = await withTimeout(loadDataFromCloud(), 5000);
+      await seedDatabase(defaults);
+      // Load from cloud
+      const cloud = await loadDataFromCloud();
       if (cloud) D = cloud;
     } catch (e) {
-      console.warn('Supabase init failed, using localStorage:', e?.message || e);
+      console.warn('Supabase init failed, using localStorage:', e);
     }
   }
   renderLogin();
   console.log(`🟣 Tím Go v2.0 Pro — ${DB_ONLINE ? '☁️ Cloud Mode' : '💾 Local Mode'}`);
 })();
+
+```
+
+## File: `public/manifest.json`
+
+```json
+{
+  "name": "Tím Go — Xe ôm & Giao hàng",
+  "short_name": "Tím Go",
+  "description": "Quản lý tài xế xe ôm & giao hàng",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#7C3AED",
+  "theme_color": "#7C3AED",
+  "orientation": "portrait",
+  "lang": "vi",
+  "categories": ["transportation", "business"],
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
+```
+
+## File: `public/sw.js`
+
+```javascript
+const CACHE_NAME = 'timgo-v3.1';
+const OFFLINE_URL = '/';
+
+// Pre-cache essential assets on install
+const PRECACHE_URLS = [
+  '/',
+  '/index.html',
+  '/icon-512.png',
+  '/manifest.json',
+];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+  );
+  self.skipWaiting();
+});
+
+// Clean old caches on activate
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+// Fetch strategy: network-first for HTML/JS/CSS, cache-first for fonts/tiles
+self.addEventListener('fetch', (e) => {
+  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+
+  // Skip: API calls (Nominatim, OSRM, Supabase, Google Maps)
+  if (url.hostname.includes('nominatim') || url.hostname.includes('osrm') ||
+      url.hostname.includes('supabase') || url.hostname.includes('openstreetmap') || url.hostname.includes('google.com')) return;
+
+  // Cache-first for Google Fonts & Leaflet CDN (rarely changes)
+  if (url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com') ||
+      url.hostname.includes('unpkg.com')) {
+    e.respondWith(
+      caches.match(e.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(e.request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // Network-first for app assets (HTML, JS, CSS) — always get fresh, fallback to cache
+  e.respondWith(
+    fetch(e.request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(e.request).then((cached) => cached || caches.match(OFFLINE_URL)))
+  );
+});
+
+```
+
+## File: `package.json`
+
+```json
+{
+  "name": "timgo",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4"
+  },
+  "devDependencies": {
+    "vite": "^8.0.4"
+  }
+}
+
+```
+

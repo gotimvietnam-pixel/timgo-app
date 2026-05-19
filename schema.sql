@@ -1,18 +1,22 @@
 -- ========================================
--- 🟣 TÍM GO v2.0 — Supabase Schema
+-- 🟣 TÍM GO v3.0 Pro — Supabase Schema
 -- Chạy trong Supabase SQL Editor
 -- ========================================
 
 -- 1. Users (Admin + Driver)
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  phone TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
+  phone TEXT,                    -- Nullable: TX Zalo chưa có SĐT khi đăng ký
+  password_hash TEXT,            -- Nullable: TX Zalo không dùng mật khẩu
   role TEXT NOT NULL CHECK (role IN ('admin', 'driver')),
-  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'blocked')),
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'blocked', 'pending')),
+  zalo_id TEXT UNIQUE,           -- Zalo OAuth user ID
+  zalo_name TEXT,                -- Tên trên Zalo
+  zalo_avatar TEXT,              -- Avatar URL từ Zalo
   vehicle_plate TEXT,
   vehicle_type TEXT DEFAULT 'xe_may',
+  cccd TEXT,                     -- Số CCCD
   commission_type TEXT DEFAULT 'percent',
   commission_value INTEGER DEFAULT 20,
   online BOOLEAN DEFAULT false,
