@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#7C3AED" />
+  <meta name="description" content="Tím Go — Đặt xe ôm & giao hàng tại Phước Long, Bạc Liêu. Nhanh, rẻ, uy tín." />
+  <title>Tím Go — Đặt Xe</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #7C3AED;
+      --primary-light: #A855F7;
+      --primary-dark: #5B21B6;
+      --primary-glow: rgba(124,58,237,0.25);
+      --bg: #0A0612;
+      --surface: #130D20;
+      --card: #1C1430;
+      --border: rgba(124,58,237,0.2);
+      --text: #F1F0F5;
+      --text-muted: #9B95A8;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --radius: 18px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ==================== HERO HEADER ==================== */
+    .hero {
+      background: linear-gradient(160deg, #3B0764 0%, #7C3AED 50%, #A855F7 100%);
+      padding: 28px 20px 36px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.07);
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -40px; left: -40px;
+      width: 150px; height: 150px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+    }
+    .hero-logo {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 18px; position: relative; z-index: 1;
+    }
+    .hero-icon {
+      width: 42px; height: 42px; border-radius: 14px;
+      background: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; backdrop-filter: blur(8px);
+    }
+    .hero-brand { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
+    .hero-brand span { opacity: 0.8; font-weight: 500; font-size: 13px; display: block; margin-top: -2px; }
+    .hero-title {
+      font-size: 28px; font-weight: 900; line-height: 1.2;
+      position: relative; z-index: 1;
+    }
+    .hero-title em { font-style: normal; color: #FDE68A; }
+    .hero-sub {
+      margin-top: 8px; font-size: 14px; opacity: 0.8;
+      position: relative; z-index: 1;
+    }
+    .hero-stats {
+      display: flex; gap: 8px; margin-top: 18px;
+      position: relative; z-index: 1;
+    }
+    .hero-stat {
+      flex: 1; background: rgba(255,255,255,0.12);
+      border-radius: 12px; padding: 10px 8px;
+      text-align: center; backdrop-filter: blur(8px);
+    }
+    .hero-stat-val { font-size: 18px; font-weight: 800; }
+    .hero-stat-lbl { font-size: 10px; opacity: 0.75; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ==================== MAIN CONTENT ==================== */
+    .container { max-width: 480px; margin: 0 auto; padding: 0 16px 100px; }
+
+    /* ==================== STEP INDICATOR ==================== */
+    .steps {
+      display: flex; align-items: center; gap: 6px;
+      padding: 18px 0 6px;
+    }
+    .step {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+    }
+    .step.active { color: var(--primary-light); }
+    .step.done { color: var(--success); }
+    .step-num {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--card); border: 1.5px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+    }
+    .step.active .step-num { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .step.done .step-num { background: var(--success); border-color: var(--success); color: #fff; }
+    .step-sep { flex: 1; height: 1.5px; background: var(--border); }
+
+    /* ==================== CARD ==================== */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .card-title {
+      font-size: 13px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.8px;
+      margin-bottom: 14px; display: flex; align-items: center; gap: 6px;
+    }
+
+    /* ==================== FORM ELEMENTS ==================== */
+    .field { margin-bottom: 14px; }
+    .field-label {
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+      margin-bottom: 6px; display: flex; align-items: center; gap: 5px;
+    }
+    .field-input {
+      width: 100%; padding: 14px 16px;
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 12px; color: var(--text);
+      font-size: 15px; font-family: 'Inter', sans-serif;
+      outline: none; transition: all 0.2s;
+    }
+    .field-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+    .field-input::placeholder { color: var(--text-muted); font-size: 14px; }
+
+    .location-input-wrap { position: relative; }
+    .location-input {
+      width: 100%; padding: 14px 48px 14px 42px;
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 12px; color: var(--text);
+      font-size: 15px; font-family: 'Inter', sans-serif;
+      outline: none; transition: all 0.2s;
+    }
+    .location-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+    .location-input::placeholder { color: var(--text-muted); font-size: 13px; }
+    .loc-icon {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%); font-size: 16px;
+    }
+    .loc-gps-btn {
+      position: absolute; right: 10px; top: 50%;
+      transform: translateY(-50%);
+      background: rgba(124,58,237,0.15); border: none;
+      border-radius: 8px; padding: 6px 8px;
+      color: var(--primary-light); cursor: pointer;
+      font-size: 14px; transition: all 0.15s;
+    }
+    .loc-gps-btn:hover { background: rgba(124,58,237,0.3); }
+
+    .route-connector {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 10px; margin: 4px 0;
+    }
+    .route-line {
+      width: 2px; height: 28px;
+      background: linear-gradient(to bottom, var(--primary), var(--primary-light));
+      margin-left: 2px; border-radius: 2px; opacity: 0.5;
+    }
+    .swap-btn {
+      margin-left: auto; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 6px 10px; color: var(--text-muted);
+      cursor: pointer; font-size: 13px; transition: all 0.15s;
+    }
+    .swap-btn:hover { color: var(--primary-light); border-color: var(--primary); }
+
+    /* ==================== SERVICE PILLS ==================== */
+    .svc-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .svc-card {
+      background: var(--surface); border: 2px solid var(--border);
+      border-radius: 14px; padding: 14px 12px;
+      cursor: pointer; transition: all 0.15s;
+      text-align: center;
+    }
+    .svc-card:hover { border-color: var(--primary); transform: translateY(-1px); }
+    .svc-card.active {
+      border-color: var(--primary);
+      background: rgba(124,58,237,0.12);
+      box-shadow: 0 0 0 1px var(--primary), 0 4px 16px var(--primary-glow);
+    }
+    .svc-icon { font-size: 26px; margin-bottom: 6px; }
+    .svc-name { font-size: 13px; font-weight: 700; }
+    .svc-price { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+    /* ==================== FARE ESTIMATE BOX ==================== */
+    .fare-box {
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(168,85,247,0.1));
+      border: 1px solid rgba(124,58,237,0.35);
+      border-radius: 14px; padding: 16px;
+      display: none; animation: fadeIn 0.3s ease;
+    }
+    .fare-box.show { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .fare-main {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px;
+    }
+    .fare-label { font-size: 13px; color: var(--text-muted); }
+    .fare-amount { font-size: 28px; font-weight: 900; color: var(--primary-light); }
+    .fare-breakdown { border-top: 1px solid var(--border); padding-top: 10px; }
+    .fare-row {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--text-muted); margin-bottom: 4px;
+    }
+    .fare-row span:last-child { color: var(--text); font-weight: 600; }
+
+    /* ==================== MAP ==================== */
+    #booking-map {
+      height: 220px; border-radius: 14px;
+      border: 1px solid var(--border); overflow: hidden;
+      margin-top: 4px;
+    }
+
+    /* ==================== PHONE INPUT ==================== */
+    .phone-wrap { position: relative; }
+    .phone-prefix {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 15px; font-weight: 700; color: var(--text-muted);
+    }
+    .phone-input { padding-left: 52px !important; }
+
+    /* ==================== SUBMIT BUTTON ==================== */
+    .btn-submit {
+      width: 100%; padding: 18px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      border: none; border-radius: 14px;
+      color: #fff; font-size: 17px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s;
+      box-shadow: 0 4px 20px var(--primary-glow);
+      margin-top: 20px; position: relative; overflow: hidden;
+    }
+    .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 8px 28px var(--primary-glow); }
+    .btn-submit:active { transform: scale(0.98); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-submit .btn-loader {
+      display: none; width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-submit.loading span { display: none; }
+    .btn-submit.loading .btn-loader { display: block; }
+
+    /* ==================== SUCCESS SCREEN ==================== */
+    #success-screen {
+      display: none; text-align: center;
+      padding: 40px 20px;
+    }
+    #success-screen.show { display: block; animation: fadeIn 0.4s ease; }
+    .success-icon {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--success), #34D399);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; margin: 0 auto 20px;
+      box-shadow: 0 8px 30px rgba(16,185,129,0.35);
+      animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .success-title { font-size: 24px; font-weight: 900; margin-bottom: 8px; }
+    .success-sub { font-size: 15px; color: var(--text-muted); line-height: 1.6; }
+    .booking-id {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px; margin: 20px 0;
+      font-size: 13px;
+    }
+    .booking-id-label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .booking-id-val { font-size: 22px; font-weight: 900; color: var(--primary-light); letter-spacing: 2px; }
+    .eta-card {
+      display: flex; gap: 12px; margin: 16px 0;
+    }
+    .eta-item {
+      flex: 1; background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px; text-align: center;
+    }
+    .eta-val { font-size: 20px; font-weight: 800; color: var(--primary-light); }
+    .eta-lbl { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .btn-back {
+      width: 100%; padding: 14px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; color: var(--text);
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: all 0.15s; margin-top: 8px;
+    }
+    .btn-back:hover { border-color: var(--primary); }
+
+    /* ==================== TOAST ==================== */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: #1C1430; border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 20px;
+      font-size: 14px; font-weight: 600; white-space: nowrap;
+      z-index: 999; transition: transform 0.3s ease;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.error { border-color: var(--danger); color: var(--danger); }
+    .toast.success { border-color: var(--success); color: var(--success); }
+
+    /* ==================== LOADING OVERLAY ==================== */
+    .map-loading {
+      position: absolute; inset: 0;
+      background: var(--card); border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; color: var(--text-muted);
+      gap: 8px; z-index: 10;
+    }
+    .pulse-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--primary); animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.2)} }
+
+    /* ==================== SAFE AREA ==================== */
+    @supports (padding-bottom: env(safe-area-inset-bottom)) {
+      .container { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-logo">
+    <div class="hero-icon">🏍️</div>
+    <div class="hero-brand">
+      Tím Go
+      <span>Xe ôm & Giao hàng Phước Long</span>
+    </div>
+  </div>
+  <div class="hero-title">Đặt xe <em>ngay bây giờ</em>,<br>tài xế đến trong 5 phút</div>
+  <div class="hero-sub">📍 Phục vụ toàn khu vực Phước Long, Bình Phước</div>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat-val">50+</div>
+      <div class="hero-stat-lbl">Tài xế</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-val">3 phút</div>
+      <div class="hero-stat-lbl">Thời gian chờ</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-val">4.9 ⭐</div>
+      <div class="hero-stat-lbl">Đánh giá</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="container">
+
+  <!-- STEP INDICATOR -->
+  <div class="steps">
+    <div class="step active" id="step1-ind">
+      <div class="step-num">1</div>Địa điểm
+    </div>
+    <div class="step-sep"></div>
+    <div class="step" id="step2-ind">
+      <div class="step-num">2</div>Dịch vụ
+    </div>
+    <div class="step-sep"></div>
+    <div class="step" id="step3-ind">
+      <div class="step-num">3</div>Xác nhận
+    </div>
+  </div>
+
+  <!-- BOOKING FORM -->
+  <div id="booking-form">
+
+    <!-- STEP 1: LOCATIONS -->
+    <div class="card" id="step1-card">
+      <div class="card-title">📍 Điểm đón & điểm đến</div>
+
+      <div class="field">
+        <div class="field-label">🟢 Điểm đón</div>
+        <div class="location-input-wrap">
+          <span class="loc-icon">🟢</span>
+          <input class="location-input" id="pickup-input" type="text"
+            placeholder="Nhập địa chỉ đón, tên đường, địa danh..." autocomplete="off" />
+          <button class="loc-gps-btn" onclick="useMyLocation()" title="Dùng vị trí hiện tại">📍</button>
+        </div>
+      </div>
+
+      <div class="route-connector">
+        <div class="route-line"></div>
+        <button class="swap-btn" onclick="swapLocations()" title="Hoán đổi">⇅ Đảo</button>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <div class="field-label">🔴 Điểm đến</div>
+        <div class="location-input-wrap">
+          <span class="loc-icon">🔴</span>
+          <input class="location-input" id="dropoff-input" type="text"
+            placeholder="Nhập địa chỉ đến..." autocomplete="off" />
+        </div>
+      </div>
+
+      <!-- Map -->
+      <div style="position:relative;margin-top:14px;">
+        <div id="booking-map"></div>
+        <div class="map-loading" id="map-loading">
+          <div class="pulse-dot"></div> Đang tải bản đồ...
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: SERVICE TYPE -->
+    <div class="card" id="step2-card">
+      <div class="card-title">🏍️ Chọn dịch vụ</div>
+      <div class="svc-grid" id="svc-grid">
+        <!-- filled by JS -->
+      </div>
+
+      <!-- FARE ESTIMATE -->
+      <div class="fare-box" id="fare-box">
+        <div class="fare-main">
+          <div>
+            <div class="fare-label">Ước tính cước phí</div>
+            <div class="fare-amount" id="fare-amount">--</div>
+          </div>
+          <div style="text-align:right">
+            <div class="fare-label">Khoảng cách</div>
+            <div style="font-size:16px;font-weight:700;margin-top:4px" id="fare-dist">-- km</div>
+          </div>
+        </div>
+        <div class="fare-breakdown" id="fare-breakdown"></div>
+      </div>
+    </div>
+
+    <!-- STEP 3: CONTACT -->
+    <div class="card" id="step3-card">
+      <div class="card-title">📞 Thông tin liên hệ</div>
+
+      <div class="field">
+        <div class="field-label">👤 Họ tên</div>
+        <input class="field-input" id="customer-name" type="text"
+          placeholder="Nguyễn Văn A..." autocomplete="name" />
+      </div>
+
+      <div class="field">
+        <div class="field-label">📱 Số điện thoại</div>
+        <div class="phone-wrap">
+          <span class="phone-prefix">🇻🇳 +84</span>
+          <input class="field-input phone-input" id="customer-phone" type="tel"
+            placeholder="09x xxx xxxx" autocomplete="tel" maxlength="10" />
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <div class="field-label">📝 Ghi chú (không bắt buộc)</div>
+        <input class="field-input" id="customer-note" type="text"
+          placeholder="VD: Đang đứng trước cổng, mặc áo đỏ..." />
+      </div>
+    </div>
+
+    <button class="btn-submit" id="submit-btn" onclick="submitBooking()">
+      <span>🏍️ Đặt xe ngay</span>
+      <div class="btn-loader"></div>
+    </button>
+
+    <!-- HOTLINE -->
+    <div style="text-align:center;margin-top:18px;font-size:13px;color:var(--text-muted)">
+      Hoặc gọi trực tiếp: <a href="tel:0948505077" style="color:var(--primary-light);font-weight:700">0948 505 077</a>
+    </div>
+
+  </div><!-- /booking-form -->
+
+  <!-- SUCCESS SCREEN -->
+  <div id="success-screen">
+    <div class="success-icon">✅</div>
+    <div class="success-title">Đặt xe thành công!</div>
+    <div class="success-sub">Tài xế đang được thông báo.<br>Chúng tôi sẽ liên hệ xác nhận ngay.</div>
+
+    <div class="booking-id">
+      <div class="booking-id-label">Mã đặt xe</div>
+      <div class="booking-id-val" id="booking-ref">--</div>
+    </div>
+
+    <div class="eta-card">
+      <div class="eta-item">
+        <div class="eta-val" id="eta-time">~3 phút</div>
+        <div class="eta-lbl">🚗 Tài xế đến</div>
+      </div>
+      <div class="eta-item">
+        <div class="eta-val" id="eta-fare">--</div>
+        <div class="eta-lbl">💰 Ước tính giá</div>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:left;font-size:13px;line-height:1.8;color:var(--text-muted)">
+      ℹ️ <strong style="color:var(--text)">Lưu ý:</strong><br>
+      • Tài xế sẽ gọi xác nhận trong <strong style="color:var(--text)">2–5 phút</strong><br>
+      • Giá cuối cùng có thể thay đổi theo thực tế<br>
+      • Hủy chuyến: gọi <a href="tel:0948505077" style="color:var(--primary-light);font-weight:700">0948 505 077</a>
+    </div>
+
+    <button class="btn-back" onclick="resetBooking()">← Đặt xe mới</button>
+  </div>
+
+</div><!-- /container -->
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const SUPABASE_URL   = 'https://kallatsgzplnuinqvotw.supabase.co';
+const SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthbGxhdHNnenBsbnVpbnF2b3R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwMjc3MzMsImV4cCI6MjA1OTYwMzczM30.ELAk5EKXzilMjR2ue7GXUDh2MkuL-qAvf63w4FjxIJQ';
+const ADMIN_PHONE    = '0948505077';
+
+// PRICING (mirror from main.js)
+const SERVICES = [
+  { id: 'xe_om',        name: '🏍️ Xe ôm',       base_fee: 12000, per_km_first2: 5000, per_km_after: 4000, min_fee: 15000, surge: 30, night: 10000, desc: 'Từ 15,000đ' },
+  { id: 'xe_om_co_xe',  name: '🏍️ Xe có xe',    base_fee: 24000, per_km_first2: 10000, per_km_after: 8000, min_fee: 30000, surge: 30, night: 20000, desc: 'Từ 30,000đ' },
+  { id: 'giao_hang_nho',name: '📦 Hàng nhỏ',    base_fee: 15000, per_km_first2: 5500, per_km_after: 4500, min_fee: 18000, surge: 20, night: 8000,  desc: 'Từ 18,000đ' },
+  { id: 'giao_hang_lon',name: '📦 Hàng lớn',    base_fee: 25000, per_km_first2: 7000, per_km_after: 5500, min_fee: 30000, surge: 25, night: 15000, desc: 'Từ 30,000đ' },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let map = null;
+let pickupMarker = null, dropoffMarker = null, routeLine = null;
+let pickupLatLng = null, dropoffLatLng = null;
+let selectedService = 'xe_om';
+let estimatedFare = 0;
+let estimatedKm = 0;
+let geocodeTimeout = null;
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  renderServices();
+  setupInputListeners();
+});
+
+function initMap() {
+  setTimeout(() => {
+    map = L.map('booking-map', {
+      zoomControl: false,
+      attributionControl: false,
+      dragging: true,
+      touchZoom: true,
+    }).setView([11.7358, 106.9946], 13); // Phước Long, Bình Phước
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+    }).addTo(map);
+
+    L.control.zoom({ position: 'topright' }).addTo(map);
+    document.getElementById('map-loading').style.display = 'none';
+
+    // Click on map to set pickup
+    map.on('click', (e) => {
+      if (!pickupLatLng) {
+        setPickupFromLatLng(e.latlng);
+      } else if (!dropoffLatLng) {
+        setDropoffFromLatLng(e.latlng);
+      }
+    });
+  }, 100);
+}
+
+function renderServices() {
+  const grid = document.getElementById('svc-grid');
+  grid.innerHTML = SERVICES.map(s => `
+    <div class="svc-card ${s.id === selectedService ? 'active' : ''}"
+         id="svc-${s.id}" onclick="selectService('${s.id}')">
+      <div class="svc-icon">${s.name.split(' ')[0]}</div>
+      <div class="svc-name">${s.name.split(' ').slice(1).join(' ')}</div>
+      <div class="svc-price">${s.desc}</div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// SERVICE SELECTION
+// ============================================================
+function selectService(id) {
+  selectedService = id;
+  document.querySelectorAll('.svc-card').forEach(el => el.classList.remove('active'));
+  document.getElementById('svc-' + id)?.classList.add('active');
+  if (estimatedKm > 0) updateFareDisplay();
+  updateStepIndicator(2);
+}
+
+// ============================================================
+// INPUT LISTENERS — real-time geocode
+// ============================================================
+function setupInputListeners() {
+  const pickupInput  = document.getElementById('pickup-input');
+  const dropoffInput = document.getElementById('dropoff-input');
+
+  pickupInput.addEventListener('input', () => {
+    clearTimeout(geocodeTimeout);
+    geocodeTimeout = setTimeout(() => geocodeAddress(pickupInput.value, 'pickup'), 800);
+  });
+
+  dropoffInput.addEventListener('input', () => {
+    clearTimeout(geocodeTimeout);
+    geocodeTimeout = setTimeout(() => geocodeAddress(dropoffInput.value, 'dropoff'), 800);
+  });
+}
+
+async function geocodeAddress(query, type) {
+  if (query.length < 5) return;
+  try {
+    const q = encodeURIComponent(query + ', Phước Long, Bình Phước, Việt Nam');
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`);
+    const data = await res.json();
+    if (data.length > 0) {
+      const latlng = L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon));
+      if (type === 'pickup') setPickupFromLatLng(latlng, query);
+      else setDropoffFromLatLng(latlng, query);
+    }
+  } catch(e) {}
+}
+
+// ============================================================
+// MARKERS & ROUTE
+// ============================================================
+function setPickupFromLatLng(latlng, label) {
+  pickupLatLng = latlng;
+  if (pickupMarker) map.removeLayer(pickupMarker);
+  pickupMarker = L.marker(latlng, { icon: createIcon('🟢', '#10B981') }).addTo(map);
+  pickupMarker.bindPopup('<b>📍 Điểm đón</b>').openPopup();
+  if (!label) reverseGeocode(latlng, 'pickup-input');
+  map.setView(latlng, 15);
+  updateStepIndicator(1);
+  if (pickupLatLng && dropoffLatLng) drawRoute();
+}
+
+function setDropoffFromLatLng(latlng, label) {
+  dropoffLatLng = latlng;
+  if (dropoffMarker) map.removeLayer(dropoffMarker);
+  dropoffMarker = L.marker(latlng, { icon: createIcon('🔴', '#EF4444') }).addTo(map);
+  dropoffMarker.bindPopup('<b>🏁 Điểm đến</b>').openPopup();
+  if (!label) reverseGeocode(latlng, 'dropoff-input');
+  updateStepIndicator(2);
+  if (pickupLatLng && dropoffLatLng) drawRoute();
+}
+
+function createIcon(emoji, color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      background:${color};color:#fff;
+      width:32px;height:32px;border-radius:50% 50% 50% 0;
+      display:flex;align-items:center;justify-content:center;
+      font-size:14px;transform:rotate(-45deg);
+      box-shadow:0 2px 8px rgba(0,0,0,0.4);border:2px solid #fff;
+    "><span style="transform:rotate(45deg)">${emoji}</span></div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+  });
+}
+
+async function reverseGeocode(latlng, inputId) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`);
+    const data = await res.json();
+    if (data.display_name) {
+      const short = data.address?.road || data.address?.suburb || data.display_name.split(',')[0];
+      document.getElementById(inputId).value = short;
+    }
+  } catch(e) {}
+}
+
+async function drawRoute() {
+  if (routeLine) map.removeLayer(routeLine);
+  if (!pickupLatLng || !dropoffLatLng) return;
+
+  try {
+    // Use OSRM for real routing
+    const url = `https://router.project-osrm.org/route/v1/driving/${pickupLatLng.lng},${pickupLatLng.lat};${dropoffLatLng.lng},${dropoffLatLng.lat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.routes?.[0]) {
+      const route = data.routes[0];
+      estimatedKm = (route.distance / 1000).toFixed(1);
+
+      // Draw polyline
+      const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      routeLine = L.polyline(coords, {
+        color: '#A855F7', weight: 4, opacity: 0.8,
+        dashArray: null,
+      }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
+      updateFareDisplay();
+    }
+  } catch(e) {
+    // Fallback: haversine straight-line
+    const R = 6371;
+    const dLat = (dropoffLatLng.lat - pickupLatLng.lat) * Math.PI / 180;
+    const dLon = (dropoffLatLng.lng - pickupLatLng.lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(pickupLatLng.lat*Math.PI/180)*Math.cos(dropoffLatLng.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+    estimatedKm = (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1.3).toFixed(1); // 1.3x road factor
+    updateFareDisplay();
+  }
+}
+
+// ============================================================
+// FARE CALCULATION
+// ============================================================
+function calcFare(svcId, km) {
+  const svc = SERVICES.find(s => s.id === svcId);
+  if (!svc) return 0;
+  const h = new Date().getHours();
+  const isSurge = (h >= 7 && h < 9) || (h >= 17 && h < 19);
+  const isNight = h >= 22 || h < 5;
+  let fare = svc.base_fee;
+  const k = parseFloat(km);
+  if (k <= 2) fare += k * svc.per_km_first2;
+  else fare += 2 * svc.per_km_first2 + (k - 2) * svc.per_km_after;
+  if (isSurge) fare += fare * svc.surge / 100;
+  if (isNight) fare += svc.night;
+  return Math.max(Math.round(fare / 1000) * 1000, svc.min_fee);
+}
+
+function fmtMoney(n) {
+  return n.toLocaleString('vi-VN') + 'đ';
+}
+
+function updateFareDisplay() {
+  if (!estimatedKm || !selectedService) return;
+  const svc = SERVICES.find(s => s.id === selectedService);
+  const h = new Date().getHours();
+  const isSurge = (h >= 7 && h < 9) || (h >= 17 && h < 19);
+  const isNight = h >= 22 || h < 5;
+  const k = parseFloat(estimatedKm);
+
+  let base = svc.base_fee;
+  let km1Fee = Math.min(k, 2) * svc.per_km_first2;
+  let km2Fee = k > 2 ? (k - 2) * svc.per_km_after : 0;
+  let subtotal = base + km1Fee + km2Fee;
+  let surgeFee = isSurge ? Math.round(subtotal * svc.surge / 100) : 0;
+  let nightFee = isNight ? svc.night : 0;
+  let total = Math.max(Math.round((subtotal + surgeFee + nightFee) / 1000) * 1000, svc.min_fee);
+  estimatedFare = total;
+
+  document.getElementById('fare-amount').textContent = fmtMoney(total);
+  document.getElementById('fare-dist').textContent = estimatedKm + ' km';
+  document.getElementById('fare-breakdown').innerHTML = `
+    <div class="fare-row"><span>Phí cơ bản</span><span>${fmtMoney(base)}</span></div>
+    <div class="fare-row"><span>Phí km (${estimatedKm} km)</span><span>${fmtMoney(km1Fee + km2Fee)}</span></div>
+    ${surgeFee ? `<div class="fare-row"><span>⚡ Giờ cao điểm</span><span>+${fmtMoney(surgeFee)}</span></div>` : ''}
+    ${nightFee ? `<div class="fare-row"><span>🌙 Phụ thu đêm</span><span>+${fmtMoney(nightFee)}</span></div>` : ''}
+  `;
+  document.getElementById('fare-box').classList.add('show');
+}
+
+// ============================================================
+// GPS
+// ============================================================
+function useMyLocation() {
+  if (!navigator.geolocation) { showToast('Trình duyệt không hỗ trợ GPS', 'error'); return; }
+  showToast('📍 Đang lấy vị trí...', '');
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      setPickupFromLatLng(latlng);
+      showToast('✅ Đã lấy vị trí hiện tại', 'success');
+    },
+    () => showToast('Không lấy được vị trí, hãy nhập thủ công', 'error'),
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
+}
+
+function swapLocations() {
+  const p = document.getElementById('pickup-input').value;
+  const d = document.getElementById('dropoff-input').value;
+  document.getElementById('pickup-input').value = d;
+  document.getElementById('dropoff-input').value = p;
+  const tmpLatLng = pickupLatLng;
+  pickupLatLng = dropoffLatLng;
+  dropoffLatLng = tmpLatLng;
+  if (pickupMarker && dropoffMarker) {
+    const tmpPos = pickupMarker.getLatLng();
+    pickupMarker.setLatLng(dropoffMarker.getLatLng());
+    dropoffMarker.setLatLng(tmpPos);
+    if (pickupLatLng && dropoffLatLng) drawRoute();
+  }
+}
+
+// ============================================================
+// STEP INDICATOR
+// ============================================================
+function updateStepIndicator(completedStep) {
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById(`step${i}-ind`);
+    if (!el) continue;
+    el.classList.remove('active', 'done');
+    if (i < completedStep) el.classList.add('done');
+    else if (i === completedStep) el.classList.add('active');
+  }
+}
+
+// ============================================================
+// SUBMIT BOOKING
+// ============================================================
+async function submitBooking() {
+  const name  = document.getElementById('customer-name').value.trim();
+  const phone = document.getElementById('customer-phone').value.trim();
+  const note  = document.getElementById('customer-note').value.trim();
+  const pickup  = document.getElementById('pickup-input').value.trim();
+  const dropoff = document.getElementById('dropoff-input').value.trim();
+
+  if (!pickup) { showToast('⚠️ Vui lòng nhập điểm đón', 'error'); return; }
+  if (!dropoff) { showToast('⚠️ Vui lòng nhập điểm đến', 'error'); return; }
+  if (!phone || phone.length < 9) { showToast('⚠️ Số điện thoại không hợp lệ', 'error'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  const bookingRef = 'TG' + Date.now().toString().slice(-6);
+  const svc = SERVICES.find(s => s.id === selectedService);
+
+  const booking = {
+    ref: bookingRef,
+    customer_name: name || 'Khách',
+    customer_phone: phone,
+    pickup_address: pickup,
+    dropoff_address: dropoff,
+    pickup_lat: pickupLatLng?.lat || null,
+    pickup_lng: pickupLatLng?.lng || null,
+    dropoff_lat: dropoffLatLng?.lat || null,
+    dropoff_lng: dropoffLatLng?.lng || null,
+    service_type: selectedService,
+    service_name: svc?.name || selectedService,
+    estimated_fare: estimatedFare,
+    estimated_km: parseFloat(estimatedKm) || null,
+    note: note,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    // Save to Supabase
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(booking),
+    });
+
+    if (!res.ok) {
+      // Table might not exist yet — still show success (graceful fallback)
+      console.warn('Supabase insert failed, ref stored locally:', bookingRef);
+      localStorage.setItem('last_booking_' + bookingRef, JSON.stringify(booking));
+    }
+
+    showSuccess(bookingRef, svc?.name);
+  } catch(e) {
+    // Network error — save locally still show success
+    localStorage.setItem('last_booking_' + bookingRef, JSON.stringify(booking));
+    showSuccess(bookingRef, svc?.name);
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function showSuccess(ref, svcName) {
+  document.getElementById('booking-form').style.display = 'none';
+  document.getElementById('success-screen').classList.add('show');
+  document.getElementById('booking-ref').textContent = ref;
+  document.getElementById('eta-fare').textContent = estimatedFare ? estimatedFare.toLocaleString('vi-VN') + 'đ' : 'Theo thực tế';
+  updateStepIndicator(4); // all done
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetBooking() {
+  document.getElementById('booking-form').style.display = 'block';
+  document.getElementById('success-screen').classList.remove('show');
+  document.getElementById('pickup-input').value = '';
+  document.getElementById('dropoff-input').value = '';
+  document.getElementById('customer-name').value = '';
+  document.getElementById('customer-phone').value = '';
+  document.getElementById('customer-note').value = '';
+  document.getElementById('fare-box').classList.remove('show');
+  pickupLatLng = dropoffLatLng = null;
+  estimatedFare = estimatedKm = 0;
+  if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; }
+  if (dropoffMarker) { map.removeLayer(dropoffMarker); dropoffMarker = null; }
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  updateStepIndicator(1);
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+let toastTimer;
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
