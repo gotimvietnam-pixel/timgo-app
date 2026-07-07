@@ -61,6 +61,7 @@ export async function loadAllData() {
       { data: activityLog },
       { data: pricingRows },
       { data: settingsRows },
+      { data: zaloViolations },
     ] = await Promise.all([
       supabase.from('users').select('*'),
       supabase.from('trips').select('*').order('created_at', { ascending: false }),
@@ -70,6 +71,7 @@ export async function loadAllData() {
       supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('pricing').select('*'),
       supabase.from('settings').select('*'),
+      supabase.from('zalo_violations').select('*').order('occurred_at', { ascending: false }).limit(500),
     ]);
 
     const pricing = pricingRows?.[0]?.config || null;
@@ -85,6 +87,7 @@ export async function loadAllData() {
       pricing,
       settings,
       shifts: [],
+      zaloViolations: zaloViolations || [],
     };
   } catch (err) {
     console.error('❌ loadAllData error:', err);
@@ -143,6 +146,12 @@ function mapUserToDB(u) {
     vehicle_plate: u.vehicle_plate || null,
     vehicle_type: u.vehicle_type || 'xe_may',
     cccd: u.cccd || null,
+    dob: u.dob || null,                    // Ngày sinh
+    deposit_note: u.deposit_note || null,  // Tiền dằn cọc (Miễn/200+/500)
+    uniform_note: u.uniform_note || null,  // Tiền áo (260/100+160)
+    ao_so: u.ao_so || null,                // Số áo (để tra khi có vấn đề)
+    ao_size: u.ao_size || null,            // Size áo (S/M/L/XL)
+    ao_soluong: u.ao_soluong || null,      // Số lượng áo đã phát
     commission_type: u.commission_type || 'percent',
     commission_value: u.commission_value || 20,
     online: u.online || false,
@@ -239,6 +248,27 @@ export async function dbSaveWalletEntry(entry) {
     created_at: entry.at || new Date().toISOString(),
   });
   if (error) console.error('❌ saveWalletEntry:', error);
+}
+
+// ============================================================
+// ZALO VIOLATIONS (bot audit Zalo — .brain/SHARED/gotim_*.py)
+// ============================================================
+export async function dbResolveViolation(violationId, resolvedBy) {
+  if (!isOnline) return;
+  const { error } = await supabase
+    .from('zalo_violations')
+    .update({ resolved_at: new Date().toISOString(), resolved_by: resolvedBy })
+    .eq('id', violationId);
+  if (error) console.error('❌ resolveViolation:', error);
+}
+
+export async function dbBackfillViolationDriver(zaloSenderId, driverId) {
+  if (!isOnline) return;
+  const { error } = await supabase
+    .from('zalo_violations')
+    .update({ driver_id: driverId })
+    .eq('zalo_sender_id', zaloSenderId);
+  if (error) console.error('❌ backfillViolationDriver:', error);
 }
 
 // ============================================================

@@ -8,8 +8,9 @@ import {
   initSupabase, isSupabaseOnline, loadAllData, hashPassword, verifyPassword,
   dbSaveUser, dbUpdateUserField, dbSaveTrip, dbSaveInvoice, dbSaveDebt,
   dbUpdateDebt, dbSaveWalletEntry, dbSavePricing, dbSaveSettings, dbAddLog,
-  seedDatabase, dbLogin,
+  seedDatabase, dbLogin, dbResolveViolation, dbBackfillViolationDriver,
 } from './supabase.js';
+import './seed-data.js';
 
 // ============================================================
 // DATA STORE
@@ -56,6 +57,7 @@ function getDefaultData() {
     },
     walletHistory: [],
     fundTransactions: [],
+    zaloViolations: [],
     fundExpenses: [],
     debts: [],
     invoices: [],
@@ -83,6 +85,42 @@ function loadData() {
       return d;
     }
   } catch (e) {}
+  
+  // Try loading from Excel seed data
+  if (window.EXCEL_SEED_DATA) {
+    const sd = window.EXCEL_SEED_DATA;
+    console.log('📊 Loading Excel data: ' + sd.users.length + ' users, ' + sd.trips.length + ' trips');
+    const data = {
+      ...getDefaultData(),
+      users: sd.users,
+      trips: sd.trips,
+      invoices: sd.invoices || [],
+      debts: sd.debts || [],
+      fundInfo: sd.fundInfo || { fund_start: 0, fund_current: 0, commission_total: 0, fee_total: 0 },
+      fundExpenses: sd.fundExpenses || [],
+      fundPenalties: sd.fundPenalties || [],
+      revenueSummary: sd.revenueSummary || [],
+      driverMonthly: sd.driverMonthly || {},
+      dutySchedule: sd.dutySchedule || { shifts: [], rules: [] },
+      marketingFund: sd.marketingFund || { current: 0, expenses: [] },
+      driverStatus: {},
+      leaveRequests: [],
+    };
+    // Initialize driver statuses
+    data.users.filter(u => u.role === 'driver' && u.status === 'active').forEach((d, i) => {
+      const statuses = ['available', 'on_trip', 'available', 'available', 'offline', 'available', 'on_trip', 'available', 'available', 'available', 'on_leave', 'available', 'available', 'available'];
+      const st = statuses[i % statuses.length];
+      data.driverStatus[d.id] = {
+        status: st,
+        service_type: st === 'on_trip' ? 'xe_om' : null,
+        since: new Date(Date.now() - Math.random() * 3600000).toISOString(),
+        trip_count_today: Math.floor(Math.random() * 8) + 1
+      };
+    });
+    saveDataLocal(data);
+    return data;
+  }
+  
   const data = getDefaultData();
   generateSampleTrips(data);
   saveDataLocal(data);
@@ -105,6 +143,7 @@ async function loadDataFromCloud() {
         pricing: cloud.pricing || getDefaultData().pricing,
         settings: cloud.settings || getDefaultData().settings,
         shifts: [],
+        zaloViolations: cloud.zaloViolations || [],
       };
       saveDataLocal(data); // Cache locally
       return data;
@@ -186,6 +225,9 @@ let driverMarkers = {}; // Map markers per driver
 let gpsWatchId = null; // Geolocation watch ID
 let activeTrip = null; // Current 1-Tap trip in progress
 let tripTrackPoints = []; // GPS points during active trip
+let adminActiveTab = 'dispatch'; // Current admin tab
+let adminOrderFilter = { service: 'all', driver: 'all' };
+let adminDebtTab = 'pending'; // pending | collected | stats
 
 // ============================================================
 // UTILITIES
@@ -575,10 +617,6 @@ function renderLogin() {
             <label class="form-label">Mật khẩu *</label>
             <input type="password" class="form-input" id="reg-pass" placeholder="Tối thiểu 6 ký tự" />
           </div>
-          <div class="form-group">
-            <label class="form-label">Biển số xe</label>
-            <input type="text" class="form-input" id="reg-plate" placeholder="VD: 59P1-12345" />
-          </div>
           <div id="reg-err" class="alert alert-danger" style="display:none"></div>
           <div id="reg-ok" class="alert alert-success" style="display:none"></div>
           <button class="btn btn-primary" onclick="G.register()">📝 Gửi đăng ký</button>
@@ -591,67 +629,532 @@ function renderLogin() {
 }
 
 // ============================================================
-// ADMIN SCREENS
+// ADMIN SCREENS — 6 MODULES + AI DISPATCH
 // ============================================================
+const adminScreens = ['scr-a-dispatch','scr-a-chietkhau','scr-a-donhang','scr-a-congno','scr-a-xinphep','scr-a-taichinh','scr-a-settings','scr-a-drivers','scr-a-trips','scr-a-finance','scr-a-pricing','scr-a-debts','scr-a-quy-config','scr-a-quy-report','scr-a-zalo-audit','scr-a-zalo-mapping','scr-a-duty'];
+
 function renderAdmin() {
   stopDriverGPS();
+  adminActiveTab = 'dispatch';
+  if (!D.driverStatus) D.driverStatus = {};
+  if (!D.leaveRequests) D.leaveRequests = [];
+  // Ensure driver statuses exist
+  D.users.filter(u => u.role === 'driver' && u.status === 'active').forEach((d, i) => {
+    if (!D.driverStatus[d.id]) {
+      D.driverStatus[d.id] = { status: 'available', service_type: null, since: new Date().toISOString(), trip_count_today: 0 };
+    }
+  });
   app().innerHTML = [
-    adminDashboard(), adminDrivers(), adminTrips(), adminFinance(),
+    adminDispatch(), adminChietKhau(), adminDonHang(), adminCongNo(), adminXinPhep(), adminTaiChinh(),
+    adminDrivers(), adminTrips(), adminFinance(),
     adminPricing(), adminDebts(), adminQuyConfig(), adminQuyReport(), adminSettings(),
+    adminZaloAudit(), adminZaloMapping(), adminDutyRoster(),
     `<div class="modal-overlay" id="modal-ov" onclick="G.closeModal()"><div class="modal-sheet" onclick="event.stopPropagation()" id="modal-c"></div></div>`,
     adminNav()
   ].join('');
-  show('scr-a-dash', 'nav-a', adminScreens);
-  // Init map after DOM is ready
+  show('scr-a-dispatch', 'nav-a', adminScreens);
   setTimeout(() => initAdminMap(), 100);
 }
 
-const adminScreens = ['scr-a-dash','scr-a-drivers','scr-a-trips','scr-a-finance','scr-a-more'];
+// Helper: get driver status info
+function getDrvStatus(drvId) {
+  return D.driverStatus?.[drvId] || { status: 'offline', service_type: null, since: new Date().toISOString(), trip_count_today: 0 };
+}
+function statusEmoji(st) {
+  return { available: '🟢', on_trip: '🔴', on_leave: '🟡', offline: '⚫' }[st] || '⚫';
+}
+function statusLabel(st) {
+  return { available: 'Trống', on_trip: 'Đang chạy', on_leave: 'Nghỉ phép', offline: 'Offline' }[st] || 'N/A';
+}
+function timeSince(iso) {
+  const diff = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (diff < 1) return 'vừa xong';
+  if (diff < 60) return diff + ' phút';
+  return Math.floor(diff / 60) + 'h ' + (diff % 60) + 'p';
+}
+function svcIcon(type) {
+  return { xe_om: '🏍️', giao_ho: '📦', mua_ho: '🛒', lay_ho: '🔄', giao_hang: '🚚', giao_hang_nho: '📦', giao_hang_lon: '🚚' }[type] || '🏍️';
+}
 
-function adminDashboard() {
+// =================== MODULE 1: DISPATCH BOARD ===================
+function adminDispatch() {
+  const drivers = D.users.filter(u => u.role === 'driver' && u.status === 'active');
+  const counts = { available: 0, on_trip: 0, on_leave: 0, offline: 0 };
+  drivers.forEach(d => { const st = getDrvStatus(d.id).status; counts[st] = (counts[st] || 0) + 1; });
   const trips = allTodayTrips();
-  const drivers = D.users.filter(u => u.role === 'driver');
-  const active = drivers.filter(d => d.status === 'active');
-  const online = active.filter(d => d.online).length;
   const totAmt = trips.reduce((s,t) => s + t.amount, 0);
-  const totDebt = trips.filter(t => t.payment_status === 'debt').reduce((s,t) => s + t.amount, 0);
-  const totComm = trips.reduce((s,t) => s + (t.commission_amount||0), 0);
 
-  const warns = [];
-  active.forEach(d => {
-    if (d.online) {
-      const dt = todayTrips(d.id);
-      if (dt.length === 0) warns.push({t:'danger', m:`🔴 ${d.name} — Online nhưng chưa có cuốc`});
-      if (dt.filter(x=>x.payment_status==='debt').length >= 2) warns.push({t:'warning', m:`🟡 ${d.name} — Nhiều cuốc nợ liên tiếp`});
-    }
-  });
-
-  return `<div class="screen" id="scr-a-dash">
+  return `<div class="screen" id="scr-a-dispatch">
     <div class="header">
       <div class="header-top">
-        <div><div class="header-greeting">Xin chào, Admin 👋</div><div class="header-name">Tím Go</div><div class="header-date">📅 ${vnDate()}${isSurge() ? ' — 🔴 GIỜ CAO ĐIỂM' : ''}${isNight() ? ' — 🌙 Phí đêm' : ''}</div></div>
+        <div><div class="header-greeting">Xin chào, Admin 👋</div><div class="header-name">📡 Bảng Điều Phối</div><div class="header-date">📅 ${vnDate()}${isSurge() ? ' — 🔴 GIỜ CAO ĐIỂM' : ''}${isNight() ? ' — 🌙 Phí đêm' : ''}</div></div>
         <div class="header-badge" onclick="G.logout()">🚪</div>
       </div>
     </div>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-icon">🟢</div><div class="stat-value">${online}/${active.length}</div><div class="stat-label">TX Online</div></div>
-      <div class="stat-card"><div class="stat-icon">🏍️</div><div class="stat-value">${trips.length}</div><div class="stat-label">Tổng cuốc</div></div>
-      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-value">${fmt(totAmt)}</div><div class="stat-label">Doanh thu</div></div>
-      <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-value text-warning">${fmt(totDebt)}</div><div class="stat-label">Khách nợ</div></div>
-      <div class="stat-card"><div class="stat-icon">📈</div><div class="stat-value text-primary">${D.settings.default_commission_value}%</div><div class="stat-label">Hoa hồng</div></div>
-      <div class="stat-card"><div class="stat-icon">💵</div><div class="stat-value text-success">${fmt(totComm)}</div><div class="stat-label">Phải thu</div></div>
+    <div class="dispatch-summary">
+      <span>Hôm nay: <b>${counts.available + counts.on_trip}/${drivers.length}</b> online</span>
+      <span>• <span style="color:#10B981">${counts.available} trống</span></span>
+      <span>• <span style="color:#EF4444">${counts.on_trip} đang chạy</span></span>
+      <span>• <span style="color:#F59E0B">${counts.on_leave} nghỉ</span></span>
     </div>
-    <div class="section" style="margin-top:-8px;"><div class="section-header"><div class="section-title">🗺️ Bản đồ tài xế</div><span class="section-action" onclick="G.toggleMapFullscreen()">⛶ Phóng to</span></div></div>
+    <div class="dispatch-grid">
+      ${drivers.map(d => {
+        const st = getDrvStatus(d.id);
+        const shortName = d.name.split(' ').pop();
+        const tr = todayTrips(d.id);
+        return `<div class="dispatch-card dispatch-${st.status}" onclick="G.driverDetail('${d.id}')">
+          <div class="dispatch-card-status">${statusEmoji(st.status)}</div>
+          <div class="dispatch-card-name">${shortName}</div>
+          <div class="dispatch-card-info">${statusLabel(st.status)}</div>
+          ${st.status === 'on_trip' && st.service_type ? `<div class="dispatch-card-svc">${svcIcon(st.service_type)}</div>` : ''}
+          <div class="dispatch-card-meta">${timeSince(st.since)} · ${st.trip_count_today || tr.length} cuốc</div>
+        </div>`;
+      }).join('')}
+    </div>
+    ${adminAIDispatch()}
+    <div class="section" style="margin-top:8px;"><div class="section-header"><div class="section-title">🗺️ Bản đồ tài xế</div><span class="section-action" onclick="G.toggleMapFullscreen()">⛶ Phóng to</span></div></div>
     <div class="map-container" id="map-wrapper"><div id="admin-map" style="width:100%;height:100%;"></div></div>
     <div id="map-filter-counts" class="date-filter" style="padding:8px 16px;"></div>
-    <div class="section" style="margin-top:-8px;">
-      <div id="driver-status-list"></div>
+    <div class="section" style="margin-top:-8px;"><div id="driver-status-list"></div></div>
+  </div>`;
+}
+
+// =================== AI SMART DISPATCH ===================
+function adminAIDispatch() {
+  const drivers = D.users.filter(u => u.role === 'driver' && u.status === 'active');
+  // Find longest available driver
+  let longestAvail = null;
+  let longestMin = 0;
+  drivers.forEach(d => {
+    const st = getDrvStatus(d.id);
+    if (st.status === 'available') {
+      const min = Math.round((Date.now() - new Date(st.since).getTime()) / 60000);
+      if (min > longestMin) { longestMin = min; longestAvail = d; }
+    }
+  });
+  // Warnings
+  const warns = [];
+  const pendingDebts = (D.debts || []).filter(d => d.status === 'pending');
+  const oldDebts = pendingDebts.filter(d => {
+    const days = Math.round((Date.now() - new Date(d.date || d.created_at).getTime()) / 86400000);
+    return days > 7;
+  });
+  if (oldDebts.length > 0) warns.push(`⚠️ ${oldDebts.length} khoản nợ > 7 ngày chưa thu`);
+  // Revenue
+  const todayTripsAll = allTodayTrips();
+  const todayRev = todayTripsAll.reduce((s,t) => s + t.amount, 0);
+  // Yesterday revenue for comparison
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  const ydStr = yesterday.toISOString().split('T')[0];
+  const ydTrips = D.trips.filter(t => t.date === ydStr);
+  const ydRev = ydTrips.reduce((s,t) => s + t.amount, 0);
+  const revChange = ydRev > 0 ? Math.round(((todayRev - ydRev) / ydRev) * 100) : 0;
+
+  return `<div class="section"><div class="ai-dispatch-panel">
+    <div class="ai-dispatch-title">🤖 AI Smart Dispatch</div>
+    ${longestAvail ? `<div class="ai-dispatch-item ai-suggest">
+      <span>💡 Gợi ý: <b>${longestAvail.name.split(' ').pop()}</b> rảnh ${longestMin} phút, hôm nay ${getDrvStatus(longestAvail.id).trip_count_today || todayTrips(longestAvail.id).length} cuốc</span>
+    </div>` : ''}
+    ${warns.map(w => `<div class="ai-dispatch-item ai-warn">${w}</div>`).join('')}
+    <div class="ai-dispatch-item ai-stat">
+      📊 Doanh thu hôm nay: <b>${fmt(todayRev)}</b> ${revChange !== 0 ? `(${revChange > 0 ? '↑' : '↓'}${Math.abs(revChange)}% so hôm qua)` : ''}
     </div>
-    ${warns.length ? `<div class="section"><div class="section-title mb-8">⚠️ Cảnh báo</div>${warns.map(w=>`<div class="alert alert-${w.t}">${w.m}</div>`).join('')}</div>` : ''}
-    <div class="section"><div class="section-header"><div class="section-title">📋 Cuốc gần nhất</div><span class="section-action" onclick="G.showA('scr-a-trips')">Xem tất cả →</span></div>
-    ${trips.slice(0,5).map(t => tripCard(t, true)).join('')}
+    <div class="ai-dispatch-item ai-stat">
+      🏍️ Tổng cuốc: <b>${todayTripsAll.length}</b> · Nợ: <b>${pendingDebts.length}</b> khoản (${fmtFull(pendingDebts.reduce((s,d) => s + d.amount, 0))})
+    </div>
+  </div></div>`;
+}
+
+// =================== MODULE 2: CHIẾT KHẤU ===================
+function adminChietKhau() {
+  const drivers = D.users.filter(u => u.role === 'driver' && u.status === 'active');
+  let totalCK = 0, totalFee = 0;
+  const rows = drivers.map(d => {
+    // Use revenueSummary if available, else compute from trips
+    const rs = (D.revenueSummary || []).find(r => r.name === d.name);
+    const dm = D.driverMonthly?.[d.id] || {};
+    const allTrips = D.trips.filter(t => t.driver_id === d.id);
+    const totalIncome = rs ? rs.total_income : allTrips.reduce((s,t) => s + t.amount, 0);
+    const totalOrders = rs ? rs.total_orders : allTrips.length;
+    const ck = Math.round(totalIncome * 0.2);
+    const fee = dm.fee_month || 0;
+    totalCK += ck;
+    totalFee += fee;
+    return { ...d, totalIncome, totalOrders, ck, fee, rank: rs?.rank || '-' };
+  }).sort((a,b) => b.totalIncome - a.totalIncome);
+
+  return `<div class="screen" id="scr-a-chietkhau">
+    <div class="header"><div class="header-top"><div><div class="header-name">💰 Chiết Khấu</div><div class="header-date">Hoa hồng 20% · ${vnDate()}</div></div></div></div>
+    <div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-value text-primary">${fmt(totalCK)}</div><div class="stat-label">Tổng CK 20%</div></div>
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-value">${fmt(totalFee)}</div><div class="stat-label">Tổng phí</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title mb-8">👤 Chi tiết từng tài xế</div>
+      <div class="ck-table">
+        <div class="ck-header"><span>#</span><span>Tên</span><span>Cuốc</span><span>Doanh thu</span><span>CK 20%</span></div>
+        ${rows.map((r, i) => `<div class="ck-row">
+          <span class="ck-rank">${i + 1}</span>
+          <span class="ck-name">${r.name.split(' ').pop()}</span>
+          <span>${r.totalOrders}</span>
+          <span class="fw-bold">${fmt(r.totalIncome)}</span>
+          <span class="text-primary fw-bold">${fmt(r.ck)}</span>
+        </div>`).join('')}
+      </div>
     </div>
   </div>`;
+}
+
+// =================== MODULE 3: ĐƠN HÀNG ===================
+function adminDonHang() {
+  let trips = allTodayTrips();
+  const drivers = D.users.filter(u => u.role === 'driver');
+  // Filters
+  if (adminOrderFilter.service !== 'all') trips = trips.filter(t => t.service_type === adminOrderFilter.service);
+  if (adminOrderFilter.driver !== 'all') trips = trips.filter(t => t.driver_id === adminOrderFilter.driver);
+
+  return `<div class="screen" id="scr-a-donhang">
+    <div class="header"><div class="header-top"><div><div class="header-name">📋 Đơn Hàng</div><div class="header-date">${trips.length} đơn hôm nay · ${fmtFull(trips.reduce((s,t) => s + t.amount, 0))}</div></div></div></div>
+    <div class="date-filter">
+      <button class="date-chip ${adminOrderFilter.service==='all'?'active':''}" onclick="G.filterOrders('service','all')">Tất cả</button>
+      <button class="date-chip ${adminOrderFilter.service==='xe_om'?'active':''}" onclick="G.filterOrders('service','xe_om')">🏍️ Xe ôm</button>
+      <button class="date-chip ${adminOrderFilter.service==='giao_hang_nho'?'active':''}" onclick="G.filterOrders('service','giao_hang_nho')">📦 Giao hộ</button>
+      <button class="date-chip ${adminOrderFilter.service==='giao_hang_lon'?'active':''}" onclick="G.filterOrders('service','giao_hang_lon')">🚚 Giao hàng</button>
+    </div>
+    <div class="date-filter" style="padding-top:0">
+      <select class="form-input" style="font-size:13px;padding:8px 12px;" onchange="G.filterOrders('driver', this.value)">
+        <option value="all">👤 Tất cả tài xế</option>
+        ${drivers.filter(d=>d.role==='driver').map(d => `<option value="${d.id}" ${adminOrderFilter.driver===d.id?'selected':''}>${d.name.split(' ').pop()}</option>`).join('')}
+      </select>
+    </div>
+    <div class="section">
+      ${trips.length === 0 ? '<div class="alert alert-info">Chưa có đơn hàng nào</div>' : ''}
+      ${trips.map(t => `<div class="order-card">
+        <div class="order-left">
+          <div class="order-svc">${svcIcon(t.service_type)}</div>
+        </div>
+        <div class="order-center">
+          <div class="order-driver">${driverName(t.driver_id)} <span class="order-svc-name">${svcName(t.service_type)}</span></div>
+          <div class="order-note">${t.note || ''}</div>
+        </div>
+        <div class="order-right">
+          <div class="order-amount">${fmtFull(t.amount)}</div>
+          <div class="order-time">${timeOf(t.created_at)}</div>
+          <span class="order-status ${t.payment_status}">${t.payment_status === 'paid' ? '✅' : '⚠️'}</span>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+// =================== MODULE 4: CÔNG NỢ (Smart Debt System) ===================
+function adminCongNo() {
+  const allDebts = D.debts || [];
+  const pending = allDebts.filter(d => d.status === 'pending');
+  const collected = allDebts.filter(d => d.status === 'resolved');
+  const cancelled = allDebts.filter(d => d.status === 'cancelled');
+  const totPending = pending.reduce((s,d) => s + d.amount, 0);
+  const totCollected = collected.reduce((s,d) => s + d.amount, 0);
+
+  // Helper: days since debt
+  const debtDays = (d) => Math.max(0, Math.round((Date.now() - new Date(d.date || d.created_at).getTime()) / 86400000));
+
+  // Helper: aging badge
+  const agingBadge = (d) => {
+    const days = debtDays(d);
+    if (days <= 3) return '<span class="debt-aging-badge new">🟢 Mới</span>';
+    if (days <= 7) return `<span class="debt-aging-badge warning">🟡 ${days} ngày</span>`;
+    return `<span class="debt-aging-badge danger">🔴 ${days} ngày</span>`;
+  };
+
+  // Customer history count (all-time, including resolved/cancelled)
+  const customerHistoryCount = (name) => allDebts.filter(d => (d.customer_name || 'Khách vãng lai') === name).length;
+
+  // Group pending by customer_name
+  const grouped = {};
+  pending.forEach(d => {
+    const name = d.customer_name || 'Khách vãng lai';
+    if (!grouped[name]) grouped[name] = { debts: [], total: 0 };
+    grouped[name].debts.push(d);
+    grouped[name].total += d.amount;
+  });
+
+  // DUPLICATE DETECTION: same customer, same date, different drivers
+  const duplicateWarnings = [];
+  Object.entries(grouped).forEach(([custName, g]) => {
+    const byDate = {};
+    g.debts.forEach(d => {
+      const key = d.date || 'unknown';
+      if (!byDate[key]) byDate[key] = [];
+      byDate[key].push(d);
+    });
+    Object.entries(byDate).forEach(([date, debts]) => {
+      const uniqueDrivers = [...new Set(debts.map(d => d.driver_id))];
+      if (uniqueDrivers.length > 1 && debts.length > 1) {
+        const driverNames = uniqueDrivers.map(id => driverName(id)).join(' và ');
+        const dateStr = date.split('-').reverse().join('/');
+        duplicateWarnings.push({
+          customer: custName,
+          date: dateStr,
+          rawDate: date,
+          driverNames,
+          count: debts.length,
+          debtIds: debts.map(d => d.id),
+        });
+      }
+    });
+  });
+
+  // Sort groups: highest total first
+  const sortedGroups = Object.entries(grouped).sort((a,b) => b[1].total - a[1].total);
+
+  // ========== TAB: PENDING ==========
+  const renderPending = () => {
+    let html = '';
+
+    // Duplicate warnings
+    if (duplicateWarnings.length > 0) {
+      html += duplicateWarnings.map(w => `<div class="debt-warning-banner">
+        <div class="debt-warning-text">⚠️ CẢNH BÁO TRÙNG: "${w.customer}" có ${w.count} khoản từ ${w.driverNames} cùng ngày ${w.date}. Có thể là cuốc chung — Ghép lại?</div>
+        <button class="debt-merge-btn" onclick="G.mergeDebts([${w.debtIds.map(id => `'${id}'`).join(',')}])">🔗 Ghép</button>
+      </div>`).join('');
+    }
+
+    if (sortedGroups.length === 0) {
+      return '<div class="alert alert-success">✅ Không có công nợ!</div>';
+    }
+
+    html += sortedGroups.map(([name, g]) => {
+      const historyCount = customerHistoryCount(name);
+      const oldestDays = Math.max(...g.debts.map(d => debtDays(d)));
+      const warnLevel = oldestDays <= 3 ? 'green' : oldestDays <= 7 ? 'yellow' : 'red';
+      const warnIcon = warnLevel === 'green' ? '🟢' : warnLevel === 'yellow' ? '⚠️' : '🔴';
+
+      return `<div class="debt-group">
+        <div class="debt-group-header">
+          <div>
+            <span class="debt-group-name">${name}</span>
+            <span class="debt-group-count">${g.debts.length} khoản</span>
+            ${historyCount > 3 ? '<span class="debt-risk-high">⚡ Nợ thường xuyên</span>' : ''}
+          </div>
+          <div style="text-align:right">
+            <div class="debt-group-total">${fmtFull(g.total)}</div>
+            <div style="font-size:11px;color:var(--text-muted);">${warnIcon} ${oldestDays} ngày · Nợ ${historyCount} lần</div>
+          </div>
+        </div>
+        ${g.debts.map(d => {
+          const driversInvolved = d.drivers_involved || driverName(d.driver_id);
+          const driverList = driversInvolved.toString().split(',').map(x => x.trim()).filter(Boolean);
+          const splitInfo = driverList.length > 1 ? `<div class="debt-split-info">💰 ${fmtFull(d.amount)} ÷ ${driverList.length} TX = ${fmtFull(Math.round(d.amount / driverList.length))}/người (${driverList.join(', ')})</div>` : '';
+
+          return `<div class="debt-item">
+            <div class="debt-item-info">
+              <span>${driverName(d.driver_id)} · ${d.date}</span>
+              <div style="display:flex;align-items:center;gap:6px;">
+                ${agingBadge(d)}
+                <span class="debt-item-amount">${fmtFull(d.amount)}</span>
+              </div>
+            </div>
+            ${d.note ? `<div class="debt-item-note">📝 ${d.note}</div>` : ''}
+            ${splitInfo}
+            <div class="debt-item-actions">
+              <button class="btn btn-sm btn-success" onclick="G.confirmResolve('${d.id}')">✅ Đã thu</button>
+              <button class="btn btn-sm btn-outline" onclick="G.cancelDebt('${d.id}')">❌ Xóa</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('');
+
+    return html;
+  };
+
+  // ========== TAB: COLLECTED ==========
+  const renderCollected = () => {
+    if (collected.length === 0) return '<div class="alert alert-info">Chưa có khoản nào đã thu</div>';
+    return collected.sort((a,b) => new Date(b.resolved_at || b.date) - new Date(a.resolved_at || a.date)).slice(0, 30).map(d => `<div class="trip-card" style="border-left-color:var(--success);">
+      <div class="trip-header">
+        <span class="trip-number">✅ ${driverName(d.driver_id)} · ${d.customer_name || 'Khách'}</span>
+        <span class="trip-time">${d.date}</span>
+      </div>
+      <div class="trip-amount" style="font-size:16px;">${fmtFull(d.amount)}</div>
+      ${d.resolved_method ? `<div class="trip-note">💳 ${d.resolved_method === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}${d.resolved_note ? ' · ' + d.resolved_note : ''}</div>` : ''}
+      ${d.resolved_at ? `<div class="trip-commission">Thu lúc: ${new Date(d.resolved_at).toLocaleDateString('vi-VN')} ${timeOf(d.resolved_at)}</div>` : ''}
+    </div>`).join('');
+  };
+
+  // ========== TAB: STATS ==========
+  const renderStats = () => {
+    // Build customer stats from ALL debts
+    const custStats = {};
+    allDebts.forEach(d => {
+      const name = d.customer_name || 'Khách vãng lai';
+      if (!custStats[name]) custStats[name] = { name, totalTimes: 0, totalAmount: 0, totalCollected: 0, outstanding: 0 };
+      custStats[name].totalTimes++;
+      custStats[name].totalAmount += d.amount;
+      if (d.status === 'resolved') custStats[name].totalCollected += d.amount;
+      if (d.status === 'pending') custStats[name].outstanding += d.amount;
+    });
+
+    const statsList = Object.values(custStats).sort((a,b) => b.totalTimes - a.totalTimes);
+    if (statsList.length === 0) return '<div class="alert alert-info">Chưa có dữ liệu</div>';
+
+    const totalCustomers = statsList.length;
+    const repeatOffenders = statsList.filter(c => c.totalTimes > 3).length;
+
+    return `<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin:0 0 16px;">
+      <div class="stat-card" style="opacity:1"><div class="stat-icon">👥</div><div class="stat-value">${totalCustomers}</div><div class="stat-label">Khách nợ</div></div>
+      <div class="stat-card" style="opacity:1"><div class="stat-icon">⚡</div><div class="stat-value text-danger">${repeatOffenders}</div><div class="stat-label">Nợ > 3 lần</div></div>
+      <div class="stat-card" style="opacity:1"><div class="stat-icon">💰</div><div class="stat-value text-primary">${fmt(totCollected)}</div><div class="stat-label">Đã thu</div></div>
+    </div>
+    <div class="debt-customer-stats">
+      <div class="ck-table">
+        <div class="ck-header" style="grid-template-columns:1fr 45px 70px 70px 70px;">
+          <span>Khách</span><span>Lần</span><span>Tổng nợ</span><span>Đã thu</span><span>Còn lại</span>
+        </div>
+        ${statsList.map(c => `<div class="ck-row" style="grid-template-columns:1fr 45px 70px 70px 70px;">
+          <span class="ck-name">${c.name} ${c.totalTimes > 3 ? '<span class="debt-risk-high">🔴</span>' : ''}</span>
+          <span style="text-align:center;font-weight:700;">${c.totalTimes}</span>
+          <span style="font-weight:600;">${fmt(c.totalAmount)}</span>
+          <span class="text-success" style="font-weight:600;">${fmt(c.totalCollected)}</span>
+          <span class="${c.outstanding > 0 ? 'text-danger' : 'text-success'}" style="font-weight:700;">${c.outstanding > 0 ? fmt(c.outstanding) : '✅'}</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  };
+
+  // ========== RENDER ==========
+  const tabContent = adminDebtTab === 'pending' ? renderPending() :
+                     adminDebtTab === 'collected' ? renderCollected() :
+                     renderStats();
+
+  return `<div class="screen" id="scr-a-congno">
+    <div class="header"><div class="header-top"><div><div class="header-name">📕 Công Nợ</div><div class="header-date">${pending.length} chưa thu · ${fmtFull(totPending)}</div></div>
+    <div class="header-badge" onclick="G.addDebtModal()">➕</div></div></div>
+    <div class="date-filter">
+      <button class="date-chip ${adminDebtTab==='pending'?'active':''}" onclick="G.switchDebtTab('pending')">⏳ Chưa thu (${pending.length})</button>
+      <button class="date-chip ${adminDebtTab==='collected'?'active':''}" onclick="G.switchDebtTab('collected')">✅ Đã thu (${collected.length})</button>
+      <button class="date-chip ${adminDebtTab==='stats'?'active':''}" onclick="G.switchDebtTab('stats')">📊 Thống kê</button>
+    </div>
+    <div class="section">
+      ${tabContent}
+    </div>
+  </div>`;
+}
+
+// =================== MODULE 5: XIN PHÉP ===================
+function adminXinPhep() {
+  const requests = D.leaveRequests || [];
+  const pendingReqs = requests.filter(r => r.status === 'pending');
+  const historyReqs = requests.filter(r => r.status !== 'pending');
+  const drivers = D.users.filter(u => u.role === 'driver' && u.status === 'active');
+  const onLeave = drivers.filter(d => getDrvStatus(d.id).status === 'on_leave').length;
+
+  const typeLabel = (t) => ({ full_day: '🌅 Nghỉ cả ngày', late: '⏰ Đi trễ', early: '🏃 Về sớm' }[t] || t);
+  const statusBadge = (s) => ({ pending: '⏳ Chờ duyệt', approved: '✅ Đã duyệt', rejected: '❌ Từ chối' }[s] || s);
+
+  return `<div class="screen" id="scr-a-xinphep">
+    <div class="header"><div class="header-top"><div><div class="header-name">🙋 Xin Phép</div><div class="header-date">Hôm nay: ${onLeave} nghỉ → còn ${drivers.length - onLeave}/${drivers.length} tài xế</div></div>
+    <div class="header-badge" onclick="G.addLeaveModal()">➕</div></div></div>
+    ${pendingReqs.length > 0 ? `<div class="section" style="margin-top:16px;">
+      <div class="section-title mb-8" style="color:var(--warning);">⏳ Chờ duyệt (${pendingReqs.length})</div>
+      ${pendingReqs.map(r => {
+        const drv = driver(r.driver_id);
+        return `<div class="leave-card leave-pending">
+          <div class="leave-card-top">
+            <div class="leave-card-driver">${drv ? drv.name : 'N/A'}</div>
+            <div class="leave-card-type">${typeLabel(r.type)}</div>
+          </div>
+          <div class="leave-card-date">📅 ${r.date} · ${r.reason || 'Không lý do'}</div>
+          <div class="leave-card-actions">
+            <button class="btn btn-sm btn-success" onclick="G.handleLeave('${r.id}','approved')">✅ Duyệt</button>
+            <button class="btn btn-sm btn-danger" onclick="G.handleLeave('${r.id}','rejected')">❌ Từ chối</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '<div class="section" style="margin-top:16px;"><div class="alert alert-success">✅ Không có yêu cầu chờ duyệt</div></div>'}
+    <div class="section">
+      <div class="section-title mb-8">📋 Lịch sử xin phép</div>
+      ${historyReqs.length === 0 ? '<div class="alert alert-info">Chưa có lịch sử</div>' :
+        historyReqs.slice(0, 15).map(r => {
+          const drv = driver(r.driver_id);
+          return `<div class="leave-card">
+            <div class="leave-card-top">
+              <div class="leave-card-driver">${drv ? drv.name.split(' ').pop() : 'N/A'} · ${typeLabel(r.type)}</div>
+              <div class="leave-card-status">${statusBadge(r.status)}</div>
+            </div>
+            <div class="leave-card-date">📅 ${r.date} · ${r.reason || ''}</div>
+          </div>`;
+        }).join('')}
+    </div>
+  </div>`;
+}
+
+// =================== MODULE 6: QUỸ & TÀI CHÍNH ===================
+function adminTaiChinh() {
+  const fi = D.fundInfo || { fund_start: 0, fund_current: 0, commission_total: 0, fee_total: 0 };
+  const expenses = D.fundExpenses || [];
+  const penalties = D.fundPenalties || [];
+  const mkt = D.marketingFund || { current: 0, expenses: [] };
+  const balance = getFundBalance();
+
+  // Charts data: commission per day (last 7 days)
+  const chartData = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split('T')[0];
+    const dayTrips = D.trips.filter(t => t.date === ds);
+    const dayComm = dayTrips.reduce((s,t) => s + (t.commission_amount || 0), 0);
+    chartData.push({ label: ['CN','T2','T3','T4','T5','T6','T7'][d.getDay()], value: dayComm });
+  }
+  const maxChart = Math.max(...chartData.map(c => c.value), 1);
+
+  return `<div class="screen" id="scr-a-taichinh">
+    <div class="header"><div class="header-top"><div><div class="header-name">💼 Quỹ & Tài Chính</div><div class="header-date">${vnDate()}</div></div></div></div>
+    <div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="stat-card fund-card-start"><div class="stat-icon">🏦</div><div class="stat-value">${fmt(fi.fund_start || balance)}</div><div class="stat-label">Quỹ đầu kỳ</div></div>
+      <div class="stat-card fund-card-current"><div class="stat-icon">💰</div><div class="stat-value text-success">${fmt(fi.fund_current || balance)}</div><div class="stat-label">Quỹ hiện tại</div></div>
+      <div class="stat-card"><div class="stat-icon">📈</div><div class="stat-value text-primary">${fmt(fi.commission_total || D.trips.reduce((s,t) => s + (t.commission_amount||0), 0))}</div><div class="stat-label">Tổng CK</div></div>
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-value">${fmt(fi.fee_total || 0)}</div><div class="stat-label">Tổng phí</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title mb-8">📊 CK 7 ngày qua</div>
+      <div class="chart-container"><div class="chart-bars">
+        ${chartData.map(c => `<div class="chart-bar-wrapper"><div class="chart-bar-value">${c.value > 0 ? fmt(c.value) : ''}</div><div class="chart-bar" style="height:${Math.max(c.value/maxChart*100, 5)}%"></div><div class="chart-bar-label">${c.label}</div></div>`).join('')}
+      </div></div>
+    </div>
+    <div class="section">
+      <div class="section-header"><div class="section-title">💸 Chi tiêu quỹ</div><button class="btn btn-sm btn-success" onclick="G.addFundExpenseModal()">➕ Thêm</button></div>
+      ${expenses.length === 0 ? '<div class="alert alert-info">Chưa có khoản chi</div>' :
+        expenses.slice(0, 10).map(e => `<div class="trip-card">
+          <div class="trip-header"><span class="trip-number">💸 ${e.name || e.note || 'Chi quỹ'}</span><span class="trip-time">${e.date}</span></div>
+          <div class="trip-amount text-warning">-${fmtFull(e.amount)}</div>
+          ${e.purpose ? `<div class="trip-note">${e.purpose}</div>` : ''}
+        </div>`).join('')}
+    </div>
+    <div class="section">
+      <div class="section-title mb-8">⚠️ Phạt</div>
+      ${penalties.length === 0 ? '<div class="alert alert-info">Không có khoản phạt</div>' :
+        penalties.slice(0, 10).map(p => `<div class="trip-card" style="border-left-color:var(--danger)">
+          <div class="trip-header"><span class="trip-number">⚠️ ${p.name}</span><span class="trip-time">${p.date}</span></div>
+          <div class="trip-amount text-danger">${fmtFull(p.amount)}</div>
+          <div class="trip-note">${p.reason || ''}</div>
+        </div>`).join('')}
+    </div>
+    <div class="section">
+      <div class="section-title mb-8">📣 Quỹ Marketing</div>
+      <div class="stat-card" style="opacity:1;text-align:left;padding:16px;">
+        <div class="summary-row"><span class="label">Số dư</span><span class="value text-primary fw-bold">${fmtFull(mkt.current || 0)}</span></div>
+        ${(mkt.expenses || []).slice(0, 5).map(e => `<div class="summary-row"><span class="label">${e.name || 'Chi'}</span><span class="value text-warning">-${fmtFull(e.amount)}</span></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+// =================== OLD ADMIN DASHBOARD (kept as legacy) ===================
+function adminDashboard() {
+  // Redirect to dispatch
+  return adminDispatch();
 }
 
 function tripCard(t, showDriver) {
@@ -696,7 +1199,7 @@ function adminDrivers() {
       return `<div class="driver-card ${d.status==='blocked'?'blocked':''}" onclick="G.driverDetail('${d.id}')">
         <div class="driver-top">
           <div class="driver-avatar">${d.name.charAt(0)}</div>
-          <div><div class="driver-name">${d.name}</div><div class="driver-plate">🏍️ ${d.vehicle_plate||'N/A'} · 💰 ${d.commission_value}%${d.wallet !== undefined ? ' · 💵 Ví: '+fmt(d.wallet) : ''}</div></div>
+          <div><div class="driver-name">${d.name}${d.ao_so?' · 👕#'+d.ao_so:''}${d.status==='paused'?' <span style="font-size:11px;color:var(--text-muted);">(tạm nghỉ)</span>':''}</div><div class="driver-plate">🏍️ ${d.vehicle_plate||'N/A'} · 💰 ${d.commission_value}%${d.wallet !== undefined ? ' · 💵 Ví: '+fmt(d.wallet) : ''}</div></div>
           <div class="driver-status-dot ${d.online&&d.status==='active'?'online':'offline'}"></div>
         </div>
         <div class="driver-stats">
@@ -854,6 +1357,209 @@ function adminDebts() {
     ${resolvedDebts.length > 0 ? `<div class="section"><div class="section-title mb-8 text-muted">✅ Đã thu (${resolvedDebts.length})</div>
       ${resolvedDebts.slice(0,5).map(d => `<div class="trip-card"><div class="trip-header"><span class="trip-number">✅ ${driverName(d.driver_id)}</span><span class="trip-time">${d.date}</span></div><div class="trip-amount text-muted" style="font-size:16px;text-decoration:line-through;">${fmtFull(d.amount)}</div></div>`).join('')}
     </div>` : ''}
+  </div>`;
+}
+
+const ZALO_VIOLATION_LABELS = {
+  SKIP_TRA: '⏭️ Bỏ qua trả đơn', SAI_CA: '🕒 Sai ca trực', CUOC_GIA: '🎭 Cuốc giả nghi ngờ',
+  GPS_SPOOF: '📡 GPS giả nghi ngờ', DISTANCE_TOO_FAR: '📏 Quãng đường quá xa', THIEU_BUOC: '⚠️ Thiếu bước',
+};
+
+function adminZaloAudit() {
+  const violations = (D.zaloViolations || []).slice(0, 100);
+  const unresolved = violations.filter(v => !v.resolved_at);
+  const rowHtml = (v) => {
+    const drv = v.driver_id ? D.users.find(u => u.id === v.driver_id) : null;
+    const name = drv ? drv.name : `${v.driver_name_zalo || 'Không rõ'} (chưa gán)`;
+    const label = ZALO_VIOLATION_LABELS[v.violation_type] || v.violation_type;
+    const time = v.occurred_at ? new Date(v.occurred_at).toLocaleString('vi-VN') : '';
+    return `<div class="trip-card${v.resolved_at ? '' : ' debt'}">
+      <div class="trip-header"><span class="trip-number">${label} — ${name}</span><span class="trip-time">${time}</span></div>
+      ${v.cuoc_type ? `<div class="trip-note">📦 ${v.cuoc_type}</div>` : ''}
+      ${v.distance_m != null ? `<div class="trip-note">📍 ${Math.round(v.distance_m)}m${v.speed_kmh ? ' · ' + Math.round(v.speed_kmh) + 'km/h' : ''}</div>` : ''}
+      ${v.resolved_at ? `<div class="trip-note text-success">✅ Đã xử lý bởi ${v.resolved_by || ''}</div>` :
+      `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        ${drv ? `<button class="btn btn-sm btn-outline" onclick="G.zaloFineModal('${v.id}')">💸 Phạt</button>
+        <button class="btn btn-sm btn-outline" onclick="G.zaloFundModal('${v.id}')">🟣 Cộng quỹ</button>` :
+        `<button class="btn btn-sm btn-outline" onclick="G.showA('scr-a-zalo-mapping')">🔗 Gán tài xế trước</button>`}
+        <button class="btn btn-sm btn-outline" onclick="G.zaloResolve('${v.id}')">✔️ Bỏ qua</button>
+      </div>`}
+    </div>`;
+  };
+  return `<div class="screen" id="scr-a-zalo-audit">
+    <div class="header"><div class="header-top"><div><div class="header-name">📱 Zalo Audit</div><div class="header-date">${unresolved.length} vi phạm chưa xử lý / ${violations.length} gần nhất</div></div></div></div>
+    <div class="section" style="margin-top:16px;">
+      ${violations.length === 0 ? '<div class="alert alert-success">✅ Chưa có vi phạm nào được ghi nhận từ bot Zalo.</div>' : violations.map(rowHtml).join('')}
+    </div>
+    <div class="section">
+      <button class="btn btn-outline mt-8" onclick="G.showA('scr-a-settings')">← Quay lại</button>
+    </div>
+  </div>`;
+}
+
+function adminZaloMapping() {
+  const drivers = D.users.filter(u => u.role === 'driver');
+  const mappedZaloIds = new Set(drivers.map(d => d.zalo_id).filter(Boolean));
+  const seen = new Map();
+  (D.zaloViolations || []).forEach(v => {
+    if (v.zalo_sender_id && !mappedZaloIds.has(v.zalo_sender_id)) seen.set(v.zalo_sender_id, v.driver_name_zalo);
+  });
+  const rows = Array.from(seen.entries());
+  return `<div class="screen" id="scr-a-zalo-mapping">
+    <div class="header"><div class="header-top"><div><div class="header-name">🔗 Ánh xạ tài xế Zalo</div><div class="header-date">${rows.length} tài khoản Zalo chưa gán</div></div></div></div>
+    <div class="section" style="margin-top:16px;">
+      ${rows.length === 0 ? '<div class="alert alert-success">✅ Tất cả tài khoản Zalo thấy trong vi phạm đã được gán tài xế.</div>' :
+        rows.map(([zid, name]) => `<div class="trip-card">
+          <div class="trip-header"><span class="trip-number">💬 ${name || 'Không tên'}</span></div>
+          <div class="trip-note" style="font-size:11px;color:var(--text-muted);">Zalo ID: ${zid}</div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <select class="form-input" id="zmap-${zid}" style="flex:1;">
+              <option value="">— Chọn tài xế —</option>
+              ${drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+            </select>
+            <button class="btn btn-sm btn-primary" onclick="G.assignZaloDriver('${zid}')">Gán</button>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="section">
+      <button class="btn btn-outline mt-8" onclick="G.showA('scr-a-zalo-audit')">← Quay lại</button>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// LỊCH TRỰC ĐIỂM (duty roster) — 3 suất/ngày, tự gợi ý người thay
+// ============================================================
+const DUTY_SLOTS = [
+  { id: 'som', name: 'Ca ngày sớm', time: '6h30 → 22h', cap: 2 },
+  { id: 'tre', name: 'Ca ngày trễ', time: '9h30 → tối', cap: 0 },   // 0 = đầy đủ full-ca, không giới hạn
+  { id: 'toi', name: 'Ca tối',      time: '17h-18h30 → 24h', cap: 4 },
+];
+const DUTY_WD = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
+let dutySelectedDay = (new Date().getDay() + 6) % 7; // 0=T2 ... 6=CN
+
+function ensureDuty() {
+  if (!D.settings.duty_roster) D.settings.duty_roster = {};
+  for (let w = 0; w < 7; w++) {
+    if (!D.settings.duty_roster[w]) D.settings.duty_roster[w] = { som: [], tre: [], toi: [] };
+    for (const s of ['som', 'tre', 'toi']) if (!D.settings.duty_roster[w][s]) D.settings.duty_roster[w][s] = [];
+  }
+  if (!D.settings.duty_constraints) D.settings.duty_constraints = {};
+}
+
+function dutyCountWeek(driverId) {
+  ensureDuty();
+  let n = 0;
+  for (let w = 0; w < 7; w++) for (const s of ['som', 'tre', 'toi']) if (D.settings.duty_roster[w][s].includes(driverId)) n++;
+  return n;
+}
+
+function dutyConstrained(driverId, slot, wd) {
+  ensureDuty();
+  return (D.settings.duty_constraints[driverId] || []).includes(slot + ':' + wd);
+}
+
+function dutyAssignedThatDay(driverId, wd) {
+  ensureDuty();
+  return ['som', 'tre', 'toi'].some(s => D.settings.duty_roster[wd][s].includes(driverId));
+}
+
+// 🤖 AI tự xếp lịch cả tuần — phủ đủ suất, tôn trọng ràng buộc + luật xoay + cân bằng ca
+function aiAutoFillRoster() {
+  ensureDuty();
+  const active = D.users.filter(u => u.role === 'driver' && u.status === 'active');
+  const roster = {};
+  for (let w = 0; w < 7; w++) roster[w] = { som: [], tre: [], toi: [] };
+  const weekCount = {};
+  active.forEach(d => weekCount[d.id] = 0);
+  const notes = [];
+  const canDo = (id, slot, wd) => !(D.settings.duty_constraints[id] || []).includes(slot + ':' + wd);
+
+  for (let w = 0; w < 7; w++) {
+    const prevToi = w > 0 ? roster[w - 1].toi : [];
+    const used = new Set();
+
+    // 1) Ca tối (cần 4): ưu tiên ít ca, né người vừa trực tối hôm qua (cho nghỉ)
+    const poolToi = active.filter(d => canDo(d.id, 'toi', w))
+      .sort((a, b) => (prevToi.includes(a.id) - prevToi.includes(b.id)) || (weekCount[a.id] - weekCount[b.id]));
+    for (const d of poolToi) {
+      if (roster[w].toi.length >= 4) break;
+      roster[w].toi.push(d.id); used.add(d.id); weekCount[d.id]++;
+    }
+    if (roster[w].toi.length < 4) notes.push(`${DUTY_WD[w]}: ca tối thiếu ${4 - roster[w].toi.length} người`);
+
+    // 2) Ca ngày sớm (cần 2): né người trực tối hôm qua (họ vào trễ), ưu tiên ít ca
+    const poolSom = active.filter(d => !used.has(d.id) && canDo(d.id, 'som', w) && !prevToi.includes(d.id))
+      .sort((a, b) => weekCount[a.id] - weekCount[b.id]);
+    for (const d of poolSom) {
+      if (roster[w].som.length >= 2) break;
+      roster[w].som.push(d.id); used.add(d.id); weekCount[d.id]++;
+    }
+    if (roster[w].som.length < 2) notes.push(`${DUTY_WD[w]}: ca sớm thiếu ${2 - roster[w].som.length} người`);
+
+    // 3) Ca ngày trễ (đầy đủ còn lại): ưu tiên xếp người trực tối hôm qua vào đây (luật xoay)
+    const rest = active.filter(d => !used.has(d.id))
+      .sort((a, b) => (prevToi.includes(b.id) - prevToi.includes(a.id)));
+    for (const d of rest) {
+      if (!canDo(d.id, 'tre', w)) { notes.push(`${DUTY_WD[w]}: ${driverName(d.id)} vướng ràng buộc ca trễ → bỏ trống`); continue; }
+      roster[w].tre.push(d.id); used.add(d.id); weekCount[d.id]++;
+    }
+  }
+  return { roster, notes, weekCount };
+}
+
+let _aiProposal = null;
+
+// Gợi ý người trực thay: rảnh ngày đó + không vướng ràng buộc, ai ít ca hơn xếp trước
+function suggestSubstitutes(slot, wd, excludeId) {
+  ensureDuty();
+  return D.users
+    .filter(u => u.role === 'driver' && u.status === 'active' && u.id !== excludeId)
+    .filter(d => !dutyAssignedThatDay(d.id, wd) && !dutyConstrained(d.id, slot, wd))
+    .sort((a, b) => dutyCountWeek(a.id) - dutyCountWeek(b.id))
+    .slice(0, 3);
+}
+
+function adminDutyRoster() {
+  ensureDuty();
+  const wd = dutySelectedDay;
+  const roster = D.settings.duty_roster[wd];
+  const tabs = DUTY_WD.map((n, i) =>
+    `<button class="date-chip ${i === wd ? 'active' : ''}" onclick="G.dutyPickDay(${i})">${n}</button>`
+  ).join('');
+  const slotCards = DUTY_SLOTS.map(slot => {
+    const ids = roster[slot.id] || [];
+    const capTxt = slot.cap ? `cần ${slot.cap}` : 'đầy đủ full-ca';
+    const shortfall = slot.cap && ids.length < slot.cap;
+    const chips = ids.map(id => {
+      const d = driver(id);
+      const nm = d ? d.name : '?';
+      return `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:4px 10px;margin:3px;font-size:13px;">
+        ${nm}
+        <span onclick="G.dutyMarkOff('${slot.id}',${wd},'${id}')" title="Nghỉ → gợi ý thay" style="cursor:pointer;color:var(--warning);">🔄</span>
+        <span onclick="G.dutyRemove('${slot.id}',${wd},'${id}')" title="Gỡ" style="cursor:pointer;color:var(--danger);">✕</span>
+      </span>`;
+    }).join('');
+    return `<div class="stat-card" style="opacity:1;text-align:left;padding:14px;margin-bottom:10px;${shortfall ? 'border:1px solid var(--warning);' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div><b>${slot.name}</b> <span style="font-size:12px;color:var(--text-muted);">${slot.time}</span></div>
+        <span style="font-size:12px;color:${shortfall ? 'var(--warning)' : 'var(--text-muted)'};">${ids.length}/${capTxt}</span>
+      </div>
+      <div>${chips || '<span style="font-size:13px;color:var(--text-muted);">Chưa có ai</span>'}</div>
+      <button class="btn btn-sm btn-outline mt-8" onclick="G.dutyAddModal('${slot.id}',${wd})">➕ Thêm tài xế</button>
+    </div>`;
+  }).join('');
+  return `<div class="screen" id="scr-a-duty">
+    <div class="header"><div class="header-top"><div><div class="header-name">🕒 Lịch trực</div><div class="header-date">Phân ca theo thứ · tự gợi ý người thay</div></div><div class="header-badge" onclick="G.dutyConstraintPick()">⚙️</div></div></div>
+    <div class="section" style="margin-top:12px;">
+      <button class="btn btn-primary" onclick="G.dutyAIFill()">🤖 AI xếp lịch cả tuần</button>
+    </div>
+    <div class="date-filter" style="flex-wrap:wrap;">${tabs}</div>
+    <div class="section">${slotCards}</div>
+    <div class="section">
+      <div class="alert alert-info" style="font-size:12px;">🔄 = báo nghỉ (hệ thống gợi ý người thay) · ⚙️ góc trên = cài ràng buộc từng tài xế (VD anh Ngô cấm ca tối T2-T5)</div>
+      <button class="btn btn-outline mt-8" onclick="G.showA('scr-a-settings')">← Quay lại</button>
+    </div>
   </div>`;
 }
 
@@ -1030,11 +1736,20 @@ function adminSettings() {
   return `<div class="screen" id="scr-a-settings">
     <div class="header"><div class="header-top"><div><div class="header-name">⚙️ Cài đặt & Thêm</div></div></div></div>
     <div class="section" style="margin-top:16px;">
-      <div class="section-title mb-8">📱 Menu</div>
+      <div class="section-title mb-8">🛣️ Hành trình (giám sát Zalo)</div>
+      <div class="driver-card" onclick="G.showA('scr-a-zalo-audit')" style="cursor:pointer;border-left:3px solid #0068FF;"><div class="driver-top"><div class="driver-avatar" style="font-size:24px;background:#0068FF;color:#fff;">📱</div><div><div class="driver-name">Zalo Audit</div><div class="driver-plate">${(D.zaloViolations||[]).filter(v=>!v.resolved_at).length} vi phạm chưa xử lý</div></div></div></div>
+      <div class="driver-card" onclick="G.showA('scr-a-zalo-mapping')" style="cursor:pointer"><div class="driver-top"><div class="driver-avatar" style="font-size:24px">🔗</div><div><div class="driver-name">Ánh xạ tài xế Zalo</div><div class="driver-plate">Gán Zalo ID vào tài khoản tài xế</div></div></div></div>
+    </div>
+    <div class="section">
+      <div class="section-title mb-8">💰 Tài chính & Lịch trực</div>
+      <div class="driver-card" onclick="G.showA('scr-a-duty')" style="cursor:pointer;border-left:3px solid #F59E0B;"><div class="driver-top"><div class="driver-avatar" style="font-size:24px;background:#F59E0B;color:#fff;">🕒</div><div><div class="driver-name">Lịch trực</div><div class="driver-plate">Phân ca theo thứ · tự gợi ý người thay</div></div></div></div>
       <div class="driver-card" onclick="G.showA('scr-a-pricing')" style="cursor:pointer"><div class="driver-top"><div class="driver-avatar" style="font-size:24px">🧮</div><div><div class="driver-name">Bảng giá dịch vụ</div><div class="driver-plate">Cài đặt giá theo km, tuyến, giờ</div></div></div></div>
       <div class="driver-card" onclick="G.showA('scr-a-quy-config')" style="cursor:pointer;border-left:3px solid #7C3AED;"><div class="driver-top"><div class="driver-avatar" style="font-size:24px;background:#7C3AED;color:#fff;">🟣</div><div><div class="driver-name">Cài đặt quỹ</div><div class="driver-plate">${D.settings.fund?.per_trip?.enabled?'☑Cuốc ':''}${D.settings.fund?.per_day?.enabled?'☑Ngày ':''}${D.settings.fund?.percent?.enabled?'☑%':''} · ${(D.settings.fund?.purpose||'Chưa cài')}</div></div></div></div>
       <div class="driver-card" onclick="G.showA('scr-a-quy-report')" style="cursor:pointer;border-left:3px solid #10B981;"><div class="driver-top"><div class="driver-avatar" style="font-size:24px;background:#10B981;color:#fff;">📊</div><div><div class="driver-name">Báo cáo quỹ</div><div class="driver-plate">Hiện có: ${fmt(getFundBalance())}đ</div></div></div></div>
       <div class="driver-card" onclick="G.showA('scr-a-debts')" style="cursor:pointer"><div class="driver-top"><div class="driver-avatar" style="font-size:24px">⚠️</div><div><div class="driver-name">Quản lý công nợ</div><div class="driver-plate">${D.debts.filter(d=>d.status==='pending').length} khoản chưa thu</div></div></div></div>
+    </div>
+    <div class="section">
+      <div class="section-title mb-8">⚙️ Khác</div>
       <div class="driver-card" style="cursor:pointer"><div class="driver-top"><div class="driver-avatar" style="font-size:24px">📊</div><div><div class="driver-name">Nhật ký hoạt động</div><div class="driver-plate">${D.activityLog.length} bản ghi</div></div></div></div>
     </div>
     <div class="section">
@@ -1064,12 +1779,14 @@ function adminSettings() {
 }
 
 function adminNav() {
-  return `<div class="bottom-nav" id="nav-a">
-    <button class="nav-item active" onclick="G.showA('scr-a-dash')"><span class="nav-icon">🏠</span><span class="nav-label">Tổng quan</span></button>
-    <button class="nav-item" onclick="G.showA('scr-a-drivers')"><span class="nav-icon">👤</span><span class="nav-label">Tài xế</span></button>
-    <button class="nav-item" onclick="G.showA('scr-a-trips')"><span class="nav-icon">📋</span><span class="nav-label">Cuốc</span></button>
-    <button class="nav-item" onclick="G.showA('scr-a-finance')"><span class="nav-icon">💰</span><span class="nav-label">Tài chính</span></button>
-    <button class="nav-item" onclick="G.showA('scr-a-settings')"><span class="nav-icon">⚙️</span><span class="nav-label">Thêm</span></button>
+  return `<div class="bottom-nav admin-nav-bar" id="nav-a">
+    <button class="nav-item active" onclick="G.showA('scr-a-dispatch')"><span class="nav-icon">📡</span><span class="nav-label">Điều phối</span></button>
+    <button class="nav-item" onclick="G.showA('scr-a-chietkhau')"><span class="nav-icon">💰</span><span class="nav-label">Chiết khấu</span></button>
+    <button class="nav-item" onclick="G.showA('scr-a-donhang')"><span class="nav-icon">📋</span><span class="nav-label">Đơn hàng</span></button>
+    <button class="nav-item" onclick="G.showA('scr-a-congno')"><span class="nav-icon">📕</span><span class="nav-label">Công nợ</span></button>
+    <button class="nav-item" onclick="G.showA('scr-a-xinphep')"><span class="nav-icon">🙋</span><span class="nav-label">Xin phép</span></button>
+    <button class="nav-item" onclick="G.showA('scr-a-taichinh')"><span class="nav-icon">💼</span><span class="nav-label">Tài chính</span></button>
+    <button class="nav-item" onclick="G.showA('scr-a-settings')"><span class="nav-icon">⚙️</span><span class="nav-label">Cài đặt</span></button>
   </div>`;
 }
 
@@ -1111,6 +1828,8 @@ function driverHome() {
   const paid = tr.filter(t=>t.payment_status==='paid').reduce((s,t)=>s+t.amount,0);
   const debt = tr.filter(t=>t.payment_status==='debt').reduce((s,t)=>s+t.amount,0);
   const comm = tr.reduce((s,t)=>s+(t.commission_amount||0),0);
+  const pendingDebts = D.debts.filter(d => d.driver_id === U.id && d.status === 'pending');
+  const totalDebtAmt = pendingDebts.reduce((s,d) => s + d.amount, 0);
   return `<div class="screen" id="scr-d-home">
     <div class="header"><div class="header-top">
       <div><div class="header-greeting">Xin chào 👋</div><div class="header-name">${U.name}</div><div class="header-date">📅 ${vnDate()}${isSurge()?' · 🔴 Cao điểm':''}${isNight()?' · 🌙 Đêm':''}</div></div>
@@ -1118,6 +1837,36 @@ function driverHome() {
     </div></div>
     <div id="gps-indicator" class="gps-status" onclick="G.toggleGPS()"><div class="gps-pulse"></div> 📍 Đang kết nối GPS...</div>
     <div id="active-trip-bar" style="display:none;"></div>
+
+    <!-- ⚡ QUICK ENTRY — Nhập nhanh cuốc xe -->
+    <div class="section" style="margin-top:8px;">
+      <div class="stat-card" style="opacity:1;padding:16px;background:linear-gradient(135deg,#7C3AED 0%,#A855F7 100%);color:#fff;border:none;">
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px;">⚡ Nhập nhanh cuốc</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="number" id="q-amt" placeholder="Số tiền cuốc..." inputmode="numeric"
+            style="flex:1;padding:14px;border-radius:12px;border:none;font-size:20px;font-weight:800;background:rgba(255,255,255,0.95);color:#1a1a2e;text-align:center;"
+            oninput="G.quickCalc()" />
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+          <button onclick="G.quickSet(15000)" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:#fff;font-weight:600;font-size:13px;cursor:pointer;">15k</button>
+          <button onclick="G.quickSet(20000)" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:#fff;font-weight:600;font-size:13px;cursor:pointer;">20k</button>
+          <button onclick="G.quickSet(30000)" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:#fff;font-weight:600;font-size:13px;cursor:pointer;">30k</button>
+          <button onclick="G.quickSet(50000)" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:#fff;font-weight:600;font-size:13px;cursor:pointer;">50k</button>
+          <button onclick="G.quickSet(80000)" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:#fff;font-weight:600;font-size:13px;cursor:pointer;">80k</button>
+          <button onclick="G.quickSet(100000)" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:#fff;font-weight:600;font-size:13px;cursor:pointer;">100k</button>
+          <button onclick="G.quickSet(150000)" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:#fff;font-weight:600;font-size:13px;cursor:pointer;">150k</button>
+        </div>
+        <div id="q-preview" style="margin-top:10px;padding:10px 12px;background:rgba(0,0,0,0.2);border-radius:10px;display:none;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;"><span>Chiếc khấu ${U.commission_value}%</span><span id="q-comm" style="font-weight:700;">0đ</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:4px;"><span>Anh giữ lại</span><span id="q-keep" style="font-weight:700;color:#34D399;">0đ</span></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button onclick="G.quickSaveTrip('paid')" style="flex:1;padding:14px;border-radius:12px;border:none;background:#10B981;color:#fff;font-size:15px;font-weight:700;cursor:pointer;">✅ Đã TT</button>
+          <button onclick="G.quickSaveTrip('debt')" style="flex:1;padding:14px;border-radius:12px;border:none;background:#F59E0B;color:#fff;font-size:15px;font-weight:700;cursor:pointer;">⚠️ Nợ</button>
+        </div>
+      </div>
+    </div>
+
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-icon">🏍️</div><div class="stat-value">${tr.length}</div><div class="stat-label">Cuốc</div></div>
       <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-value">${fmt(tot)}</div><div class="stat-label">Tổng</div></div>
@@ -1126,8 +1875,28 @@ function driverHome() {
       <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value">${fmt(paid)}</div><div class="stat-label">Đã TT</div></div>
       <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-value text-warning">${fmt(debt)}</div><div class="stat-label">Nợ</div></div>
     </div>
+
+    <!-- 💳 Công nợ nhanh -->
+    ${pendingDebts.length > 0 ? `
+    <div class="section">
+      <div class="section-header"><div class="section-title">⚠️ Công nợ (${pendingDebts.length})</div><span class="section-action" style="color:var(--warning);font-weight:700;">${fmtFull(totalDebtAmt)}</span></div>
+      ${pendingDebts.slice(0,3).map(d => `
+        <div class="trip-card debt" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;">
+          <div>
+            <div style="font-weight:600;">${d.customer_name || 'Khách'} ${d.customer_phone ? '· '+d.customer_phone : ''}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${d.date} · ${d.note || ''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-weight:700;color:var(--warning);">${fmtFull(d.amount)}</span>
+            <button onclick="G.quickResolveDebt('${d.id}')" style="padding:6px 10px;border-radius:8px;border:none;background:#10B981;color:#fff;font-weight:600;font-size:12px;cursor:pointer;">✅ Thu</button>
+          </div>
+        </div>
+      `).join('')}
+      ${pendingDebts.length > 3 ? `<div style="text-align:center;padding:8px;"><button class="btn btn-sm btn-outline" onclick="G.showDriverDebts()">Xem tất cả ${pendingDebts.length} khoản →</button></div>` : ''}
+    </div>` : ''}
+
     <div class="section"><div class="section-header"><div class="section-title">🟣 Cuốc hôm nay</div><span class="section-action" onclick="G.showD('scr-d-history')">Lịch sử →</span></div>
-      ${tr.length===0?'<div class="alert alert-warning">Chưa có cuốc. Bấm ➕ để thêm!</div>':''}
+      ${tr.length===0?'<div class="alert alert-warning">Nhập số tiền ở ô trên rồi bấm ✅ hoặc ⚠️!</div>':''}
       ${tr.map(t => tripCard(t, false)).join('')}
     </div>
   </div>`;
@@ -1373,7 +2142,224 @@ window.G = {
   },
   logout() { addLog('logout', `${U?.name} đăng xuất`); stopDriverGPS(); if(adminMap){adminMap.remove();adminMap=null;} driverMarkers={}; U = null; renderLogin(); },
   closeModal() { $('modal-ov').classList.remove('active'); },
-  showA(id) { show(id, 'nav-a', adminScreens); if(id==='scr-a-dash') setTimeout(()=>initAdminMap(),100); },
+  showA(id) {
+    show(id, 'nav-a', adminScreens);
+    if (id === 'scr-a-dispatch') setTimeout(() => initAdminMap(), 100);
+    // Re-render dynamic modules
+    if (id === 'scr-a-donhang') { const el = document.getElementById('scr-a-donhang'); if (el) el.outerHTML = adminDonHang(); show('scr-a-donhang', 'nav-a', adminScreens); }
+    if (id === 'scr-a-congno') { const el = document.getElementById('scr-a-congno'); if (el) el.outerHTML = adminCongNo(); show('scr-a-congno', 'nav-a', adminScreens); }
+    if (id === 'scr-a-xinphep') { const el = document.getElementById('scr-a-xinphep'); if (el) el.outerHTML = adminXinPhep(); show('scr-a-xinphep', 'nav-a', adminScreens); }
+    if (id === 'scr-a-zalo-audit') { const el = document.getElementById('scr-a-zalo-audit'); if (el) el.outerHTML = adminZaloAudit(); show('scr-a-zalo-audit', 'nav-a', adminScreens); }
+    if (id === 'scr-a-zalo-mapping') { const el = document.getElementById('scr-a-zalo-mapping'); if (el) el.outerHTML = adminZaloMapping(); show('scr-a-zalo-mapping', 'nav-a', adminScreens); }
+    if (id === 'scr-a-duty') { const el = document.getElementById('scr-a-duty'); if (el) el.outerHTML = adminDutyRoster(); show('scr-a-duty', 'nav-a', adminScreens); }
+  },
+
+  // NEW MODULE HANDLERS
+  filterOrders(key, value) {
+    adminOrderFilter[key] = value;
+    const el = document.getElementById('scr-a-donhang');
+    if (el) el.outerHTML = adminDonHang();
+    show('scr-a-donhang', 'nav-a', adminScreens);
+  },
+
+  switchDebtTab(tab) {
+    adminDebtTab = tab;
+    const el = document.getElementById('scr-a-congno');
+    if (el) el.outerHTML = adminCongNo();
+    show('scr-a-congno', 'nav-a', adminScreens);
+  },
+
+  // DEBT: Confirm resolve with proof modal
+  confirmResolve(id) {
+    const d = D.debts.find(x => x.id === id);
+    if (!d) return;
+    openModal(`<div class="modal-handle"></div>
+      <div class="modal-title">✅ Thu nợ — ${d.customer_name || 'Khách'}</div>
+      <div class="summary-bar mb-16">
+        <div class="summary-row"><span class="label">Số tiền</span><span class="value fw-bold">${fmtFull(d.amount)}</span></div>
+        <div class="summary-row"><span class="label">Tài xế</span><span class="value">${driverName(d.driver_id)}</span></div>
+        <div class="summary-row"><span class="label">Ngày nợ</span><span class="value">${d.date}</span></div>
+      </div>
+      <div class="form-group"><label class="form-label">Số tiền thực thu</label>
+        <input type="number" class="form-input" id="resolve-amount" value="${d.amount}" inputmode="numeric" />
+      </div>
+      <div class="form-group"><label class="form-label">Hình thức thu</label>
+        <select class="form-input" id="resolve-method">
+          <option value="cash">💵 Tiền mặt</option>
+          <option value="transfer">🏦 Chuyển khoản</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Ghi chú</label>
+        <input type="text" class="form-input" id="resolve-note" placeholder="VD: Thu tại quán..." />
+      </div>
+      <div class="form-group"><label class="form-label">Ngày thu</label>
+        <input type="date" class="form-input" id="resolve-date" value="${today()}" />
+      </div>
+      <button class="btn btn-success" onclick="G.submitResolve('${d.id}')">✅ Xác nhận đã thu</button>
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>
+    `);
+  },
+
+  submitResolve(id) {
+    const d = D.debts.find(x => x.id === id);
+    if (!d) return;
+    d.status = 'resolved';
+    d.resolved_at = new Date().toISOString();
+    d.resolved_amount = parseInt($('resolve-amount')?.value) || d.amount;
+    d.resolved_method = $('resolve-method')?.value || 'cash';
+    d.resolved_note = $('resolve-note')?.value || '';
+    d.resolved_date = $('resolve-date')?.value || today();
+    addLog('debt_resolve', `Thu nợ ${fmtFull(d.amount)} — ${d.customer_name || 'Khách'} (${d.resolved_method === 'cash' ? 'TM' : 'CK'})`);
+    saveData(D);
+    if (DB_ONLINE) dbUpdateDebt(id, { status: 'resolved', resolved_at: d.resolved_at, resolved_method: d.resolved_method, resolved_note: d.resolved_note }).catch(e => console.error('Debt sync:', e));
+    G.closeModal(); renderAdmin(); G.showA('scr-a-congno');
+  },
+
+  // DEBT: Merge duplicate debts
+  mergeDebts(debtIds) {
+    if (!debtIds || debtIds.length < 2) return;
+    const debts = debtIds.map(id => D.debts.find(x => x.id === id)).filter(Boolean);
+    if (debts.length < 2) return;
+    const names = [...new Set(debts.map(d => driverName(d.driver_id)))];
+    const maxAmount = Math.max(...debts.map(d => d.amount));
+    if (!confirm(`Ghép ${debts.length} khoản nợ?\n\nGiữ số tiền cao nhất: ${fmtFull(maxAmount)}\nTài xế: ${names.join(', ')}`)) return;
+    // Keep the first debt, update it
+    const keeper = debts[0];
+    keeper.amount = maxAmount;
+    keeper.drivers_involved = names.join(', ');
+    keeper.note = (keeper.note || '') + ` [Ghép từ ${debts.length} khoản]`;
+    // Cancel the rest
+    for (let i = 1; i < debts.length; i++) {
+      debts[i].status = 'cancelled';
+      debts[i].note = (debts[i].note || '') + ' [Đã ghép → ' + keeper.id + ']';
+    }
+    addLog('debt_merge', `Ghép ${debts.length} nợ → ${fmtFull(maxAmount)} (${names.join(', ')})`);
+    saveData(D);
+    renderAdmin(); G.showA('scr-a-congno');
+  },
+
+  // DEBT: Add new debt modal
+  addDebtModal() {
+    const drivers = D.users.filter(u => u.role === 'driver' && u.status === 'active');
+    const existingCustomers = [...new Set((D.debts || []).map(d => d.customer_name).filter(Boolean))];
+    openModal(`<div class="modal-handle"></div>
+      <div class="modal-title">➕ Thêm công nợ</div>
+      <div class="form-group"><label class="form-label">Tên khách nợ</label>
+        <input type="text" class="form-input" id="debt-customer" placeholder="VD: Anh Phong" list="debt-cust-list" />
+        <datalist id="debt-cust-list">${existingCustomers.map(c => `<option value="${c}">`).join('')}</datalist>
+      </div>
+      <div class="form-group"><label class="form-label">Số tiền nợ</label>
+        <input type="number" class="form-input" id="debt-amount" placeholder="VD: 50000" inputmode="numeric" />
+        <div class="quick-amounts" style="margin-top:8px;">
+          <button class="quick-amount" onclick="$('debt-amount').value='30000'">30k</button>
+          <button class="quick-amount" onclick="$('debt-amount').value='50000'">50k</button>
+          <button class="quick-amount" onclick="$('debt-amount').value='100000'">100k</button>
+          <button class="quick-amount" onclick="$('debt-amount').value='200000'">200k</button>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Tài xế liên quan</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;" id="debt-drivers-wrap">
+          ${drivers.map(d => `<label style="display:flex;align-items:center;gap:4px;padding:6px 10px;background:var(--bg);border-radius:8px;font-size:13px;cursor:pointer;border:1px solid var(--border);">
+            <input type="checkbox" value="${d.id}" name="debt-drivers" style="accent-color:var(--primary);" /> ${d.name.split(' ').pop()}
+          </label>`).join('')}
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Ghi chú</label>
+        <input type="text" class="form-input" id="debt-note" placeholder="VD: Giao hàng Q.7" />
+      </div>
+      <div class="form-group"><label class="form-label">Ngày</label>
+        <input type="date" class="form-input" id="debt-date" value="${today()}" />
+      </div>
+      <button class="btn btn-primary" onclick="G.submitDebt()">💾 Lưu công nợ</button>
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>
+    `);
+  },
+
+  submitDebt() {
+    const customer = $('debt-customer')?.value?.trim();
+    const amount = parseInt($('debt-amount')?.value) || 0;
+    const note = $('debt-note')?.value?.trim() || '';
+    const date = $('debt-date')?.value || today();
+    if (!customer) { alert('Nhập tên khách nợ!'); return; }
+    if (amount <= 0) { alert('Nhập số tiền!'); return; }
+    const checkedDrivers = [...document.querySelectorAll('input[name="debt-drivers"]:checked')].map(cb => cb.value);
+    const driverId = checkedDrivers[0] || 'admin1';
+    const driverNames = checkedDrivers.map(id => driverName(id)).join(', ');
+    const debt = {
+      id: 'debt' + Date.now(),
+      driver_id: driverId,
+      drivers_involved: driverNames || driverName(driverId),
+      amount,
+      customer_name: customer,
+      customer_phone: '',
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      date,
+      note,
+    };
+    D.debts.push(debt);
+    addLog('debt_add', `Thêm nợ: ${customer} — ${fmtFull(amount)}`);
+    saveData(D);
+    if (DB_ONLINE) dbSaveDebt(debt).catch(e => console.error('Debt sync:', e));
+    G.closeModal(); renderAdmin(); G.showA('scr-a-congno');
+  },
+
+  addLeaveModal() {
+    const drivers = D.users.filter(u => u.role === 'driver' && u.status === 'active');
+    openModal(`<div class="modal-handle"></div><div class="modal-title">🙋 Tạo đơn xin phép</div>
+      <div class="form-group"><label class="form-label">Tài xế</label>
+        <select class="form-input" id="leave-driver">${drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label class="form-label">Ngày</label>
+        <input type="date" class="form-input" id="leave-date" value="${today()}" />
+      </div>
+      <div class="form-group"><label class="form-label">Loại</label>
+        <select class="form-input" id="leave-type">
+          <option value="full_day">🌅 Nghỉ cả ngày</option>
+          <option value="late">⏰ Đi trễ</option>
+          <option value="early">🏃 Về sớm</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Lý do</label>
+        <input type="text" class="form-input" id="leave-reason" placeholder="VD: Việc gia đình..." />
+      </div>
+      <button class="btn btn-primary" onclick="G.submitLeave()">📝 Gửi đơn</button>
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>
+    `);
+  },
+
+  submitLeave() {
+    const req = {
+      id: 'lr' + Date.now(),
+      driver_id: $('leave-driver')?.value,
+      date: $('leave-date')?.value || today(),
+      type: $('leave-type')?.value || 'full_day',
+      reason: $('leave-reason')?.value?.trim() || '',
+      status: 'pending',
+      created_at: new Date().toISOString()
+    };
+    if (!D.leaveRequests) D.leaveRequests = [];
+    D.leaveRequests.push(req);
+    addLog('leave_request', `Xin phép: ${driverName(req.driver_id)} — ${req.type}`);
+    saveData(D);
+    G.closeModal();
+    renderAdmin();
+    G.showA('scr-a-xinphep');
+  },
+
+  handleLeave(id, action) {
+    const req = (D.leaveRequests || []).find(r => r.id === id);
+    if (!req) return;
+    req.status = action;
+    if (action === 'approved' && D.driverStatus?.[req.driver_id]) {
+      D.driverStatus[req.driver_id].status = 'on_leave';
+      D.driverStatus[req.driver_id].since = new Date().toISOString();
+    }
+    addLog('leave_' + action, `${action === 'approved' ? 'Duyệt' : 'Từ chối'} phép: ${driverName(req.driver_id)}`);
+    saveData(D);
+    renderAdmin();
+    G.showA('scr-a-xinphep');
+  },
   
   focusDriver(id) {
     const pos = DEMO_POSITIONS[id];
@@ -1748,6 +2734,154 @@ window.G = {
     renderDriver();
   },
 
+  // ⚡ QUICK ENTRY FUNCTIONS
+  quickCalc() {
+    const amt = parseInt($('q-amt')?.value) || 0;
+    const preview = $('q-preview');
+    if (amt > 0 && preview) {
+      const commAmt = Math.round(amt * U.commission_value / 100);
+      $('q-comm').textContent = fmtFull(commAmt);
+      $('q-keep').textContent = fmtFull(amt - commAmt);
+      preview.style.display = 'block';
+    } else if (preview) {
+      preview.style.display = 'none';
+    }
+  },
+
+  quickSet(val) {
+    const el = $('q-amt');
+    if (el) { el.value = val; G.quickCalc(); }
+  },
+
+  quickSaveTrip(payStatus) {
+    const amt = parseInt($('q-amt')?.value) || 0;
+    if (amt <= 0) { alert('Nhập số tiền cuốc!'); $('q-amt')?.focus(); return; }
+
+    // If debt, ask for customer info
+    if (payStatus === 'debt') {
+      G.quickDebtModal(amt);
+      return;
+    }
+
+    // Save directly for paid trips
+    G._doQuickSave(amt, payStatus, '', '');
+  },
+
+  quickDebtModal(amt) {
+    const comm = Math.round(amt * U.commission_value / 100);
+    openModal(`
+      <div class="modal-handle"></div>
+      <div class="modal-title">⚠️ Ghi nợ ${fmtFull(amt)}</div>
+      <div class="summary-bar mb-16">
+        <div class="summary-row"><span class="label">Cuốc</span><span class="value fw-bold">${fmtFull(amt)}</span></div>
+        <div class="summary-row"><span class="label">Chiếc khấu ${U.commission_value}%</span><span class="value text-primary">${fmtFull(comm)}</span></div>
+      </div>
+      <div class="form-group"><label class="form-label">👤 Tên khách (tùy chọn)</label>
+        <input type="text" class="form-input" id="qd-name" placeholder="VD: Anh Phong, Chị Duyên..." />
+      </div>
+      <div class="form-group"><label class="form-label">📞 SĐT khách (tùy chọn)</label>
+        <input type="tel" class="form-input" id="qd-phone" placeholder="09..." />
+      </div>
+      <button class="btn btn-primary mt-16" onclick="G._doQuickSave(${amt},'debt',$('qd-name')?.value||'',$('qd-phone')?.value||'')">⚠️ Lưu nợ</button>
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>
+    `);
+    setTimeout(() => $('qd-name')?.focus(), 300);
+  },
+
+  _doQuickSave(amt, payStatus, custName, custPhone) {
+    const tr = todayTrips(U.id);
+    const runTot = tr.length > 0 ? tr[0].running_total : 0;
+    const nextNum = tr.length > 0 ? tr[0].trip_number + 1 : 1;
+    const comm = Math.round(amt * U.commission_value / 100);
+    const now = new Date();
+    const tid = 't' + Date.now();
+    const payMethod = payStatus === 'debt' ? 'pending' : 'cash';
+
+    const trip = {
+      id: tid, driver_id: U.id, trip_number: nextNum, amount: amt,
+      note: payStatus === 'debt' ? `Nợ: ${custName || 'Khách'}` : 'Nhập nhanh',
+      payment_status: payStatus, payment_method: payMethod,
+      service_type: 'xe_om', distance_km: 0,
+      customer_name: custName, customer_phone: custPhone,
+      running_total: runTot + amt, commission_amount: comm,
+      created_at: now.toISOString(), date: today(), is_locked: false,
+    };
+    D.trips.push(trip);
+
+    // Fund contribution
+    const fundCfg = D.settings.fund || {};
+    let fundContrib = 0;
+    if (fundCfg.per_trip?.enabled) fundContrib += fundCfg.per_trip.amount || 0;
+    if (fundCfg.percent?.enabled) fundContrib += Math.round(comm * (fundCfg.percent.value || 0) / 100);
+    if (fundContrib > 0) {
+      const ftx = {
+        id: 'ftx' + Date.now(), trip_id: tid, driver_id: U.id,
+        amount: fundContrib, source: 'cuoc', note: 'Cuốc #' + nextNum,
+        date: today(), created_at: now.toISOString(),
+      };
+      if (!D.fundTransactions) D.fundTransactions = [];
+      D.fundTransactions.push(ftx);
+      const drv = D.users.find(u => u.id === U.id);
+      if (drv) drv.wallet = (drv.wallet || 0) - fundContrib;
+    }
+
+    // Invoice
+    const invoice = { id: 'inv'+Date.now(), trip_id: tid, driver_id: U.id, amount: amt, service_type: 'xe_om', distance_km: 0, commission: comm, payment_status: payStatus, payment_method: payMethod, created_at: now.toISOString(), date: today() };
+    D.invoices.push(invoice);
+
+    // Debt
+    let debtRecord = null;
+    if (payStatus === 'debt') {
+      debtRecord = { id: 'debt'+Date.now(), trip_id: tid, driver_id: U.id, amount: amt, customer_name: custName, customer_phone: custPhone, status: 'pending', created_at: now.toISOString(), date: today(), note: `Cuốc #${nextNum}` };
+      D.debts.push(debtRecord);
+    }
+
+    addLog('trip_quick', `⚡ Cuốc #${nextNum}: ${fmtFull(amt)} ${payStatus === 'debt' ? '(NỢ: '+custName+')' : '(Đã TT)'}`);
+    saveData(D);
+
+    // Sync to cloud
+    if (DB_ONLINE) {
+      dbSaveTrip(trip).catch(e => console.error('Trip sync:', e));
+      dbSaveInvoice(invoice).catch(e => console.error('Invoice sync:', e));
+      if (debtRecord) dbSaveDebt(debtRecord).catch(e => console.error('Debt sync:', e));
+    }
+
+    G.closeModal();
+    renderDriver();
+  },
+
+  quickResolveDebt(debtId) {
+    const d = D.debts.find(x => x.id === debtId);
+    if (!d) return;
+    if (!confirm(`Thu nợ ${fmtFull(d.amount)} từ ${d.customer_name || 'Khách'}?`)) return;
+    d.status = 'resolved';
+    d.resolved_at = new Date().toISOString();
+    addLog('debt_resolve', `Thu nợ: ${fmtFull(d.amount)} — ${d.customer_name || 'Khách'}`);
+    saveData(D);
+    if (DB_ONLINE) dbSaveDebt(d).catch(e => console.error('Debt sync:', e));
+    renderDriver();
+  },
+
+  showDriverDebts() {
+    const pendingDebts = D.debts.filter(d => d.driver_id === U.id && d.status === 'pending');
+    const totalAmt = pendingDebts.reduce((s,d) => s + d.amount, 0);
+    openModal(`
+      <div class="modal-handle"></div>
+      <div class="modal-title">⚠️ Công nợ: ${fmtFull(totalAmt)}</div>
+      ${pendingDebts.map(d => `
+        <div class="trip-card debt" style="margin-bottom:8px;">
+          <div class="trip-header"><span class="trip-number">${d.customer_name || 'Khách'} ${d.customer_phone ? '· '+d.customer_phone : ''}</span><span class="trip-time">${d.date}</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+            <div class="trip-amount" style="font-size:18px;">${fmtFull(d.amount)}</div>
+            <button class="btn btn-sm btn-success" onclick="G.quickResolveDebt('${d.id}')">✅ Đã thu</button>
+          </div>
+          ${d.note ? `<div class="trip-note">📝 ${d.note}</div>` : ''}
+        </div>
+      `).join('') || '<div class="alert alert-success">✅ Không có nợ!</div>'}
+      <button class="btn btn-outline mt-16" onclick="G.closeModal()">Đóng</button>
+    `);
+  },
+
   // ADMIN MODALS
   addDriverModal() {
     openModal(`<div class="modal-handle"></div><div class="modal-title">➕ Thêm tài xế</div>
@@ -1774,16 +2908,58 @@ window.G = {
     G.closeModal(); renderAdmin();
   },
 
+  editUniformModal(id) {
+    const d = driver(id); if(!d) return;
+    const sizes = ['S','M','L','XL','XXL'];
+    openModal(`<div class="modal-handle"></div><div class="modal-title">👕 Quản lý áo — ${d.name}</div>
+      <div class="form-group"><label class="form-label">Số áo (dùng để tra khi có vấn đề)</label><input type="text" class="form-input" id="ao-so" value="${d.ao_so||''}" placeholder="VD: 07" inputmode="numeric" style="font-size:20px;font-weight:700;" /></div>
+      <div class="form-group"><label class="form-label">Size áo</label>
+        <select class="form-input" id="ao-size">
+          <option value="">— Chọn size —</option>
+          ${sizes.map(s=>`<option value="${s}" ${d.ao_size===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Số lượng áo đã cấp</label><input type="number" class="form-input" id="ao-sl" value="${d.ao_soluong||''}" placeholder="VD: 2" inputmode="numeric" /></div>
+      <button class="btn btn-primary" onclick="G.saveUniform('${d.id}')">💾 Lưu</button>
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>
+    `);
+  },
+
+  saveUniform(id) {
+    const d = D.users.find(u=>u.id===id); if(!d) return;
+    d.ao_so = $('ao-so').value.trim() || null;
+    d.ao_size = $('ao-size').value || null;
+    const sl = parseInt($('ao-sl').value);
+    d.ao_soluong = isNaN(sl) ? null : sl;
+    addLog('driver_uniform', `Cập nhật áo ${d.name}: #${d.ao_so||'-'} size ${d.ao_size||'-'} x${d.ao_soluong||0}`);
+    saveData(D);
+    if (DB_ONLINE) {
+      dbUpdateUserField(id, 'ao_so', d.ao_so).catch(e => console.error('Uniform sync:', e));
+      dbUpdateUserField(id, 'ao_size', d.ao_size).catch(e => console.error('Uniform sync:', e));
+      dbUpdateUserField(id, 'ao_soluong', d.ao_soluong).catch(e => console.error('Uniform sync:', e));
+    }
+    G.closeModal(); renderAdmin(); G.showA('scr-a-drivers');
+  },
+
   driverDetail(id) {
     const d = driver(id); if(!d) return;
     const tr = todayTrips(id); const amt=tr.reduce((s,t)=>s+t.amount,0); const comm=tr.reduce((s,t)=>s+(t.commission_amount||0),0); const debt=tr.filter(t=>t.payment_status==='debt').reduce((s,t)=>s+t.amount,0);
     openModal(`<div class="modal-handle"></div><div class="modal-title">👤 ${d.name}</div>
       <div class="summary-bar mb-16">
-        <div class="summary-row"><span class="label">SĐT</span><span class="value">${d.phone}</span></div>
+        <div class="summary-row"><span class="label">SĐT</span><span class="value">${d.phone||'N/A'}</span></div>
+        <div class="summary-row"><span class="label">CCCD</span><span class="value">${d.cccd||'N/A'}</span></div>
+        <div class="summary-row"><span class="label">Ngày sinh</span><span class="value">${d.dob||'N/A'}</span></div>
         <div class="summary-row"><span class="label">Biển số</span><span class="value">${d.vehicle_plate||'N/A'}</span></div>
-        <div class="summary-row"><span class="label">Trạng thái</span><span class="value ${d.status==='active'?'text-success':'text-danger'}">${d.status==='active'?'🟢 Hoạt động':'🔴 Khóa'}</span></div>
+        <div class="summary-row"><span class="label">Trạng thái</span><span class="value ${d.status==='active'?'text-success':(d.status==='paused'?'text-muted':'text-danger')}">${d.status==='active'?'🟢 Hoạt động':(d.status==='paused'?'⏸️ Tạm nghỉ':'🔴 Khóa')}</span></div>
         <div class="summary-row"><span class="label">Hoa hồng</span><span class="value">${d.commission_value}%</span></div>
         <div class="summary-row"><span class="label">Ví tiền</span><span class="value text-primary">${fmtFull(d.wallet||0)}</span></div>
+      </div>
+      <div class="summary-bar mb-16">
+        <div class="summary-row"><span class="label">👕 Số áo</span><span class="value fw-bold">${d.ao_so?'#'+d.ao_so:'Chưa cấp'}</span></div>
+        <div class="summary-row"><span class="label">Size áo</span><span class="value">${d.ao_size||'N/A'}</span></div>
+        <div class="summary-row"><span class="label">Số lượng áo</span><span class="value">${d.ao_soluong?d.ao_soluong+' cái':'N/A'}</span></div>
+        <div class="summary-row"><span class="label">Tiền cọc</span><span class="value">${d.deposit_note||'N/A'}</span></div>
+        <div class="summary-row"><span class="label">Tiền áo</span><span class="value">${d.uniform_note||'N/A'}</span></div>
       </div>
       <div class="summary-bar mb-16">
         <div class="summary-row"><span class="label">Cuốc hôm nay</span><span class="value fw-bold">${tr.length}</span></div>
@@ -1794,6 +2970,7 @@ window.G = {
       ${d.status==='pending' ? `<button class="btn btn-success" onclick="G.approveDriver('${d.id}')">✅ Duyệt tài khoản</button>` : ''}
       ${d.status==='active'?`<button class="btn btn-danger mt-8" onclick="G.toggleBlock('${d.id}',true)">🔒 Khóa</button>`:''}
       ${d.status==='blocked'?`<button class="btn btn-success mt-8" onclick="G.toggleBlock('${d.id}',false)">🔓 Mở khóa</button>`:''}
+      <button class="btn btn-outline mt-8" onclick="G.editUniformModal('${d.id}')">👕 Quản lý áo</button>
       <button class="btn btn-outline mt-8" onclick="G.editDriverName('${d.id}')">✏️ Đổi tên</button>
       <button class="btn btn-outline mt-8" onclick="G.deleteDriver('${d.id}')" style="color:var(--danger);border-color:var(--danger);">🗑️ Xóa tài khoản</button>
       <button class="btn btn-outline mt-8" onclick="G.closeModal()">Đóng</button>
@@ -1846,14 +3023,8 @@ window.G = {
   },
 
   resolveDebt(id) {
-    const d = D.debts.find(x=>x.id===id);
-    if(d) {
-      d.status='resolved'; d.resolved_at=new Date().toISOString();
-      addLog('debt_resolve', `Thu nợ ${fmtFull(d.amount)}`);
-      saveData(D);
-      if (DB_ONLINE) dbUpdateDebt(id, { status: 'resolved', resolved_at: d.resolved_at }).catch(e => console.error('Debt sync:', e));
-      renderAdmin(); G.showA('scr-a-debts');
-    }
+    // Legacy: redirect to modal-based flow
+    G.confirmResolve(id);
   },
 
   cancelDebt(id) {
@@ -1864,8 +3035,212 @@ window.G = {
       addLog('debt_cancel', `Xóa nợ ${fmtFull(d.amount)}`);
       saveData(D);
       if (DB_ONLINE) dbUpdateDebt(id, { status: 'cancelled' }).catch(e => console.error('Debt sync:', e));
-      renderAdmin(); G.showA('scr-a-debts');
+      renderAdmin(); G.showA('scr-a-congno');
     }
+  },
+
+  // ============ LỊCH TRỰC ============
+  dutyPickDay(w) { dutySelectedDay = w; renderAdmin(); G.showA('scr-a-duty'); },
+
+  _dutySaveAndRefresh() {
+    saveData(D);
+    if (DB_ONLINE) dbSaveSettings(D.settings).catch(e => console.error('Duty sync:', e));
+    renderAdmin(); G.showA('scr-a-duty');
+  },
+
+  dutyAddModal(slot, wd) {
+    ensureDuty();
+    const slotObj = DUTY_SLOTS.find(s => s.id === slot);
+    const avail = D.users.filter(u => u.role === 'driver' && u.status === 'active'
+      && !dutyAssignedThatDay(u.id, wd) && !dutyConstrained(u.id, slot, wd));
+    openModal(`<div class="modal-handle"></div><div class="modal-title">➕ ${slotObj.name} — ${DUTY_WD[wd]}</div>
+      ${avail.length === 0 ? '<div class="alert alert-info">Không còn tài xế rảnh/hợp lệ cho suất này.</div>' :
+        avail.map(d => `<button class="btn btn-outline mt-8" style="text-align:left;" onclick="G.dutyAdd('${slot}',${wd},'${d.id}')">${d.name} <span style="color:var(--text-muted);font-size:12px;">· ${dutyCountWeek(d.id)} ca/tuần</span></button>`).join('')}
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Đóng</button>`);
+  },
+
+  dutyAdd(slot, wd, id) {
+    ensureDuty();
+    if (!D.settings.duty_roster[wd][slot].includes(id)) D.settings.duty_roster[wd][slot].push(id);
+    addLog('duty_assign', `Xếp ${driverName(id)} vào ${slot} ${DUTY_WD[wd]}`);
+    G.closeModal(); G._dutySaveAndRefresh();
+  },
+
+  dutyRemove(slot, wd, id) {
+    ensureDuty();
+    D.settings.duty_roster[wd][slot] = D.settings.duty_roster[wd][slot].filter(x => x !== id);
+    G._dutySaveAndRefresh();
+  },
+
+  dutyMarkOff(slot, wd, id) {
+    const subs = suggestSubstitutes(slot, wd, id);
+    const slotObj = DUTY_SLOTS.find(s => s.id === slot);
+    openModal(`<div class="modal-handle"></div><div class="modal-title">🔄 ${driverName(id)} nghỉ — ${slotObj.name} ${DUTY_WD[wd]}</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Gợi ý người trực thay (ưu tiên ít ca, không vướng ràng buộc):</div>
+      ${subs.length === 0 ? '<div class="alert alert-warning">⚠️ Không có người thay hợp lệ — cần xử lý tay.</div>' :
+        subs.map(d => `<button class="btn btn-outline mt-8" style="text-align:left;" onclick="G.dutySubstitute('${slot}',${wd},'${id}','${d.id}')">${d.name} <span style="color:var(--text-muted);font-size:12px;">· ${dutyCountWeek(d.id)} ca/tuần</span></button>`).join('')}
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Đóng</button>`);
+  },
+
+  dutySubstitute(slot, wd, offId, subId) {
+    ensureDuty();
+    const arr = D.settings.duty_roster[wd][slot];
+    const i = arr.indexOf(offId);
+    if (i >= 0) arr[i] = subId; else if (!arr.includes(subId)) arr.push(subId);
+    addLog('duty_substitute', `${driverName(offId)} nghỉ → ${driverName(subId)} thay (${slot} ${DUTY_WD[wd]})`);
+    G.closeModal(); G._dutySaveAndRefresh();
+  },
+
+  dutyAIFill() {
+    const { roster, notes } = aiAutoFillRoster();
+    _aiProposal = roster;
+    const preview = DUTY_WD.map((wn, w) => {
+      const r = roster[w];
+      const line = (slot, label) => `<div style="font-size:12px;margin:2px 0;"><b>${label}:</b> ${(r[slot].map(id => driverName(id)).join(', ')) || '<span style="color:var(--warning);">trống</span>'}</div>`;
+      return `<div class="stat-card" style="opacity:1;text-align:left;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px;">${wn}</div>
+        ${line('som', 'Sớm 6h30')}${line('tre', 'Trễ 9h30')}${line('toi', 'Tối')}
+      </div>`;
+    }).join('');
+    openModal(`<div class="modal-handle"></div><div class="modal-title">🤖 AI đề xuất lịch tuần</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Đã tôn trọng ràng buộc + luật xoay (ai trực tối → hôm sau vào trễ) + cân bằng số ca. Xem rồi bấm áp dụng, sau đó vẫn chỉnh tay được.</div>
+      ${notes.length ? `<div class="alert alert-warning" style="font-size:12px;">⚠️ ${notes.slice(0,6).join('<br>')}${notes.length>6?'<br>...':''}</div>` : '<div class="alert alert-success" style="font-size:12px;">✅ Phủ đủ mọi suất, không vướng ràng buộc.</div>'}
+      <div style="max-height:340px;overflow-y:auto;margin:8px 0;">${preview}</div>
+      <button class="btn btn-primary" onclick="G.dutyAIApply()">✅ Áp dụng lịch này</button>
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>`);
+  },
+
+  dutyAIApply() {
+    if (!_aiProposal) return;
+    ensureDuty();
+    D.settings.duty_roster = _aiProposal;
+    _aiProposal = null;
+    addLog('duty_ai_fill', 'AI tự xếp lịch trực cả tuần');
+    G.closeModal(); G._dutySaveAndRefresh();
+  },
+
+  dutyConstraintPick() {
+    const drivers = D.users.filter(u => u.role === 'driver');
+    openModal(`<div class="modal-handle"></div><div class="modal-title">⚙️ Ràng buộc tài xế</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Chọn tài xế để cài ca nào ngày nào KHÔNG được trực:</div>
+      ${drivers.map(d => { const c = (D.settings.duty_constraints?.[d.id] || []).length; return `<button class="btn btn-outline mt-8" style="text-align:left;" onclick="G.dutyConstraintModal('${d.id}')">${d.name}${c ? ` <span style="color:var(--warning);font-size:12px;">· ${c} ràng buộc</span>` : ''}</button>`; }).join('')}
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Đóng</button>`);
+  },
+
+  dutyConstraintModal(id) {
+    ensureDuty();
+    const d = driver(id);
+    const cur = D.settings.duty_constraints[id] || [];
+    const grid = DUTY_SLOTS.map(s => `
+      <div style="margin-bottom:10px;"><div style="font-weight:600;font-size:13px;margin-bottom:4px;">${s.name}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">
+        ${DUTY_WD.map((w, wi) => { const key = s.id + ':' + wi; const on = cur.includes(key); return `<label style="font-size:12px;padding:5px 9px;border-radius:6px;border:1px solid var(--border);background:${on ? 'var(--danger)' : 'var(--bg-card)'};color:${on ? '#fff' : 'var(--text)'};cursor:pointer;"><input type="checkbox" data-key="${key}" ${on ? 'checked' : ''} style="display:none;" onchange="this.parentNode.style.background=this.checked?'var(--danger)':'var(--bg-card)';this.parentNode.style.color=this.checked?'#fff':'var(--text)';">${w}</label>`; }).join('')}
+      </div></div>`).join('');
+    openModal(`<div class="modal-handle"></div><div class="modal-title">⚙️ ${d.name} — cấm trực</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Bấm ô ĐỎ = ca đó ngày đó KHÔNG được trực. VD: anh Ngô bấm đỏ Ca tối ở T2, T3, T4, T5.</div>
+      ${grid}
+      <button class="btn btn-primary mt-8" onclick="G.dutySaveConstraint('${id}')">💾 Lưu ràng buộc</button>
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>`);
+  },
+
+  dutySaveConstraint(id) {
+    ensureDuty();
+    const keys = [...document.querySelectorAll('#modal-c input[type=checkbox][data-key]')].filter(c => c.checked).map(c => c.getAttribute('data-key'));
+    D.settings.duty_constraints[id] = keys;
+    addLog('duty_constraint', `Cập nhật ràng buộc ${driverName(id)}: ${keys.length} mục`);
+    G.closeModal(); G._dutySaveAndRefresh();
+  },
+
+  // ============ ZALO AUDIT ============
+  zaloFineModal(id) {
+    const v = D.zaloViolations.find(x => x.id === id);
+    const drv = v && D.users.find(u => u.id === v.driver_id);
+    if (!v || !drv) return;
+    openModal(`<div class="modal-handle"></div><div class="modal-title">💸 Phạt ${drv.name}</div>
+      <div class="form-group"><label class="form-label">Số tiền phạt</label><input type="number" class="form-input" id="zf-amt" placeholder="Nhập số tiền..." style="font-size:20px;font-weight:700;" inputmode="numeric" /></div>
+      <div class="form-group"><label class="form-label">Lý do</label><input type="text" class="form-input" id="zf-note" value="${ZALO_VIOLATION_LABELS[v.violation_type] || v.violation_type}" /></div>
+      <button class="btn btn-primary" onclick="G.zaloFineSave('${id}')">💾 Xác nhận phạt</button>
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>
+    `);
+  },
+
+  zaloFineSave(id) {
+    const v = D.zaloViolations.find(x => x.id === id);
+    const drv = v && D.users.find(u => u.id === v.driver_id);
+    const amt = parseInt($('zf-amt')?.value) || 0;
+    if (!v || !drv || amt <= 0) { alert('Nhập số tiền!'); return; }
+    const note = $('zf-note')?.value?.trim() || 'Phạt vi phạm Zalo';
+    drv.wallet = (drv.wallet || 0) - amt;
+    const wEntry = { id: 'w' + Date.now(), driver_id: drv.id, type: 'fine', amount: amt, note, balance: drv.wallet, date: today(), at: new Date().toISOString() };
+    D.walletHistory.push(wEntry);
+    v.resolved_at = new Date().toISOString(); v.resolved_by = U?.name || 'admin';
+    addLog('zalo_fine', `Phạt ${drv.name}: ${fmtFull(amt)} — ${note}`);
+    saveData(D);
+    if (DB_ONLINE) {
+      dbSaveWalletEntry(wEntry).catch(e => console.error('Fine sync:', e));
+      dbUpdateUserField(drv.id, 'wallet', drv.wallet).catch(e => console.error('Fine sync:', e));
+      dbResolveViolation(id, U?.name || 'admin').catch(e => console.error('Violation sync:', e));
+    }
+    G.closeModal(); renderAdmin(); G.showA('scr-a-zalo-audit');
+  },
+
+  zaloFundModal(id) {
+    const v = D.zaloViolations.find(x => x.id === id);
+    const drv = v && D.users.find(u => u.id === v.driver_id);
+    if (!v || !drv) return;
+    openModal(`<div class="modal-handle"></div><div class="modal-title">🟣 Cộng quỹ từ ${drv.name}</div>
+      <div class="form-group"><label class="form-label">Số tiền đóng quỹ</label><input type="number" class="form-input" id="zq-amt" placeholder="Nhập số tiền..." style="font-size:20px;font-weight:700;" inputmode="numeric" /></div>
+      <div class="form-group"><label class="form-label">Ghi chú</label><input type="text" class="form-input" id="zq-note" value="${ZALO_VIOLATION_LABELS[v.violation_type] || v.violation_type}" /></div>
+      <button class="btn btn-primary" onclick="G.zaloFundSave('${id}')">💾 Xác nhận</button>
+      <button class="btn btn-outline mt-8" onclick="G.closeModal()">Hủy</button>
+    `);
+  },
+
+  zaloFundSave(id) {
+    const v = D.zaloViolations.find(x => x.id === id);
+    const drv = v && D.users.find(u => u.id === v.driver_id);
+    const amt = parseInt($('zq-amt')?.value) || 0;
+    if (!v || !drv || amt <= 0) { alert('Nhập số tiền!'); return; }
+    const note = $('zq-note')?.value?.trim() || 'Đóng quỹ từ vi phạm Zalo';
+    const ftx = { id: 'ftx' + Date.now(), trip_id: null, driver_id: drv.id, amount: amt, source: 'zalo_violation', note, date: today(), created_at: new Date().toISOString() };
+    if (!D.fundTransactions) D.fundTransactions = [];
+    D.fundTransactions.push(ftx);
+    drv.wallet = (drv.wallet || 0) - amt;
+    v.resolved_at = new Date().toISOString(); v.resolved_by = U?.name || 'admin';
+    addLog('zalo_fund', `Quỹ từ ${drv.name}: ${fmtFull(amt)} — ${note}`);
+    saveData(D);
+    if (DB_ONLINE) {
+      dbUpdateUserField(drv.id, 'wallet', drv.wallet).catch(e => console.error('Fund sync:', e));
+      dbResolveViolation(id, U?.name || 'admin').catch(e => console.error('Violation sync:', e));
+    }
+    G.closeModal(); renderAdmin(); G.showA('scr-a-zalo-audit');
+  },
+
+  zaloResolve(id) {
+    const v = D.zaloViolations.find(x => x.id === id);
+    if (!v) return;
+    v.resolved_at = new Date().toISOString(); v.resolved_by = U?.name || 'admin';
+    addLog('zalo_resolve', `Bỏ qua vi phạm ${v.violation_type} — ${v.driver_name_zalo || ''}`);
+    saveData(D);
+    if (DB_ONLINE) dbResolveViolation(id, U?.name || 'admin').catch(e => console.error('Violation sync:', e));
+    renderAdmin(); G.showA('scr-a-zalo-audit');
+  },
+
+  assignZaloDriver(zaloId) {
+    const sel = $('zmap-' + zaloId);
+    const driverId = sel?.value;
+    if (!driverId) { alert('Chọn tài xế!'); return; }
+    const drv = D.users.find(u => u.id === driverId);
+    if (!drv) return;
+    drv.zalo_id = zaloId;
+    (D.zaloViolations || []).forEach(v => { if (v.zalo_sender_id === zaloId) v.driver_id = driverId; });
+    addLog('zalo_map', `Gán Zalo ${zaloId} → ${drv.name}`);
+    saveData(D);
+    if (DB_ONLINE) {
+      dbUpdateUserField(driverId, 'zalo_id', zaloId).catch(e => console.error('Map sync:', e));
+      dbBackfillViolationDriver(zaloId, driverId).catch(e => console.error('Map sync:', e));
+    }
+    renderAdmin(); G.showA('scr-a-zalo-mapping');
   },
 
   saveSettings() {
