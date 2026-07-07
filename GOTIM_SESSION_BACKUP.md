@@ -9,16 +9,20 @@
 
 ## 🔴 TRẠNG THÁI HIỆN TẠI (cập nhật mỗi bước — đọc đầu tiên)
 
-**Cập nhật lúc:** 2026-07-07 23:52
+**Cập nhật lúc:** 2026-07-08
 
-**Đang ở đâu:** TOÀN BỘ CODE ĐÃ XONG + verify chạy thật. Đang **chờ người dùng chạy 2 file SQL trong Supabase** (sandbox không có mạng nên Claude không tự chạy được).
+**Đang ở đâu:** TOÀN BỘ CODE ĐÃ XONG + verify chạy thật + **đã git commit backup** (local, chưa push). Đang **chờ người dùng chạy 2 file SQL trong Supabase** (sandbox không có mạng nên Claude không tự chạy được).
+
+**Mốc git đã lưu (khôi phục được):** scratch repo (`master`) → xem `git log`; Thuc hanh repo (`main`) → `3ed5c608`. Cơ chế: commit local theo mốc, KHÔNG push. Muốn khôi phục: `git checkout <hash> -- <file>`.
+
+**Vừa làm gần nhất:** Số áo tài xế — luật từ 9 trở lên + không trùng (validate + gợi ý số trống). Đã verify. Commit scratch tiếp theo.
 
 **▶ VIỆC KẾ TIẾP NGAY (làm theo thứ tự):**
 1. ⬜ Chạy `.brain/SHARED/supabase_migration_zalo_violations.sql` trong Supabase SQL Editor.
 2. ⬜ Chạy `scratch/tools/gotim_real_data.sql` trong Supabase (⚠️ xóa tài xế mẫu → nạp 23 tài xế thật).
 3. ⬜ Chạy `python .brain/SHARED/gotim_backfill.py --from 2026-04-27 --to 2026-05-07`.
 4. ⬜ Trong app: nhập số/size/số lượng áo thật + ràng buộc lịch trực (VD Ngô cấm ca tối T2-T5).
-5. ⬜ (tùy chọn) git commit backup — CHƯA làm, đang ở nhánh `main`, 2 repo.
+5. ✅ git commit backup — ĐÃ LÀM (scratch `02f2e20`, Thuc hanh `3ed5c608`), local, chưa push.
 6. ⬜ Bật bot 24/7 — CHƯA, hỏi Sếp trước (rủi ro khóa acc Zalo).
 
 **Đang chờ Sếp quyết:** có git commit không; có nhập ràng buộc/áo thật giúp không.

@@ -1173,6 +1173,14 @@ function tripCard(t, showDriver) {
   </div>`;
 }
 
+// Số áo: từ 9 trở lên, không trùng. Trả về số trống nhỏ nhất >= 9.
+function nextFreeAoSo(excludeId) {
+  const used = new Set(D.users.filter(u => u.role === 'driver' && u.id !== excludeId && u.ao_so).map(u => parseInt(u.ao_so, 10)));
+  let n = 9;
+  while (used.has(n)) n++;
+  return n;
+}
+
 function adminDrivers() {
   const drivers = D.users.filter(u => u.role === 'driver');
   const pending = drivers.filter(d => d.status === 'pending');
@@ -2912,7 +2920,7 @@ window.G = {
     const d = driver(id); if(!d) return;
     const sizes = ['S','M','L','XL','XXL'];
     openModal(`<div class="modal-handle"></div><div class="modal-title">👕 Quản lý áo — ${d.name}</div>
-      <div class="form-group"><label class="form-label">Số áo (dùng để tra khi có vấn đề)</label><input type="text" class="form-input" id="ao-so" value="${d.ao_so||''}" placeholder="VD: 07" inputmode="numeric" style="font-size:20px;font-weight:700;" /></div>
+      <div class="form-group"><label class="form-label">Số áo (từ 9 trở lên, không trùng)</label><input type="number" min="9" class="form-input" id="ao-so" value="${d.ao_so||''}" placeholder="Gợi ý số trống: ${nextFreeAoSo(d.id)}" inputmode="numeric" style="font-size:20px;font-weight:700;" /><div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Số áo bắt đầu từ 9. Anh em không được trùng số.</div></div>
       <div class="form-group"><label class="form-label">Size áo</label>
         <select class="form-input" id="ao-size">
           <option value="">— Chọn size —</option>
@@ -2927,7 +2935,16 @@ window.G = {
 
   saveUniform(id) {
     const d = D.users.find(u=>u.id===id); if(!d) return;
-    d.ao_so = $('ao-so').value.trim() || null;
+    const raw = $('ao-so').value.trim();
+    if (raw) {
+      const num = parseInt(raw, 10);
+      if (isNaN(num) || num < 9) { alert('Số áo phải từ 9 trở lên!'); return; }
+      const dup = D.users.find(u => u.id !== id && u.role === 'driver' && u.ao_so && parseInt(u.ao_so, 10) === num);
+      if (dup) { alert(`Số áo ${num} đã có "${dup.name}" dùng! Chọn số khác (gợi ý: ${nextFreeAoSo(id)}).`); return; }
+      d.ao_so = String(num);
+    } else {
+      d.ao_so = null;
+    }
     d.ao_size = $('ao-size').value || null;
     const sl = parseInt($('ao-sl').value);
     d.ao_soluong = isNaN(sl) ? null : sl;
