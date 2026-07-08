@@ -18,12 +18,15 @@
 **Vừa làm gần nhất:** Số áo tài xế — luật từ 9 trở lên + không trùng (validate + gợi ý số trống). Đã verify. Commit scratch tiếp theo.
 
 **▶ VIỆC KẾ TIẾP NGAY (làm theo thứ tự):**
-1. ⬜ Chạy `.brain/SHARED/supabase_migration_zalo_violations.sql` trong Supabase SQL Editor.
-2. ⬜ Chạy `scratch/tools/gotim_real_data.sql` trong Supabase (⚠️ xóa tài xế mẫu → nạp 23 tài xế thật).
-3. ⬜ Chạy `python .brain/SHARED/gotim_backfill.py --from 2026-04-27 --to 2026-05-07`.
-4. ⬜ Trong app: nhập số/size/số lượng áo thật + ràng buộc lịch trực (VD Ngô cấm ca tối T2-T5).
-5. ✅ git commit backup — ĐÃ LÀM (scratch `02f2e20`, Thuc hanh `3ed5c608`), local, chưa push.
+1. ⬜ Chạy **1 file** `scratch/tools/gotim_real_data.sql` trong Supabase SQL Editor (đã GỘP: tạo bảng zalo_violations + cột hồ sơ/áo + nạp 23 tài xế + doanh thu + công nợ). ⚠️ File này XÓA tài xế mẫu.
+2. ⬜ Mở app trên máy có mạng → test: sửa 1 tài xế, F5 lại xem còn không (chứng minh cloud OK).
+3. ⬜ Deploy: `cd scratch && git push` (Vercel tự build) HOẶC `vercel --prod`. CHỈ deploy SAU bước 1.
+4. ⬜ Chạy `python .brain/SHARED/gotim_backfill.py --from 2026-04-27 --to 2026-05-07` (nạp vi phạm cũ).
+5. ⬜ Nhập số áo/ràng buộc lịch trực thật trong app.
 6. ⬜ Bật bot 24/7 — CHƯA, hỏi Sếp trước (rủi ro khóa acc Zalo).
+7. 🔴 **BẢO MẬT:** GitHub token (`ghp_...`) đang lộ trong git remote của scratch → thu hồi + gắn credential helper.
+
+git backup: đã commit local (scratch `02f2e20`→`a9bb865`, Thuc hanh `3ed5c608`), CHƯA push.
 
 **Đang chờ Sếp quyết:** có git commit không; có nhập ràng buộc/áo thật giúp không.
 

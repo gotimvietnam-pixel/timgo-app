@@ -1,6 +1,17 @@
 -- GO TÍM — dữ liệu thật từ Excel báo cáo T7/2026. Chạy trong Supabase SQL Editor.
 -- Sinh tự động bởi tools/build_import_sql.py — KIỂM TRA trước khi chạy (có xóa dữ liệu mẫu).
 
+-- 5a-0. Bảng vi phạm Zalo (bot audit) — gộp vào đây để chạy 1 lần
+create table if not exists zalo_violations (
+  id text primary key, zalo_sender_id text not null, driver_name_zalo text,
+  driver_id text references users(id) on delete set null,
+  violation_type text not null, cuoc_type text, severity text default 'warning',
+  detail jsonb, distance_m numeric, speed_kmh numeric,
+  occurred_at timestamptz not null, resolved_at timestamptz, resolved_by text,
+  created_at timestamptz not null default now());
+create index if not exists zalo_violations_driver_id_idx on zalo_violations(driver_id);
+create index if not exists zalo_violations_occurred_at_idx on zalo_violations(occurred_at desc);
+
 -- 5a. Thêm cột hồ sơ tài xế (nếu chưa có)
 alter table users add column if not exists dob text;
 alter table users add column if not exists deposit_note text;
