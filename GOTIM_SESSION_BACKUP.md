@@ -11,6 +11,8 @@
 
 **Cập nhật lúc:** 2026-07-08
 
+**📦 ĐÃ GOM TOÀN BỘ vào:** `D:\canva\Tim Go\ung dung quan ly go tim\` (app/ + bot/ + docs/ + README.md). Bản copy sạch, đã verify chạy được. Thư mục cũ `scratch\` GIỮ NGUYÊN (đang là nguồn deploy Vercel — chưa re-link).
+
 **Đang ở đâu:** TOÀN BỘ CODE ĐÃ XONG + verify chạy thật + **đã git commit backup** (local, chưa push). Đang **chờ người dùng chạy 2 file SQL trong Supabase** (sandbox không có mạng nên Claude không tự chạy được).
 
 **Mốc git đã lưu (khôi phục được):** scratch repo (`master`) → xem `git log`; Thuc hanh repo (`main`) → `3ed5c608`. Cơ chế: commit local theo mốc, KHÔNG push. Muốn khôi phục: `git checkout <hash> -- <file>`.

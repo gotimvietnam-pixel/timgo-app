@@ -2025,3 +2025,495 @@ body {
   background: var(--info-bg);
   color: #1E40AF;
 }
+
+/* ========================================
+   📡 Dispatch Board
+   ======================================== */
+
+.dispatch-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--primary-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.dispatch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.dispatch-card {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 12px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.dispatch-card:active { transform: scale(0.96); }
+
+.dispatch-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+
+.dispatch-available::before { background: #10B981; }
+.dispatch-on_trip::before { background: #EF4444; }
+.dispatch-on_leave::before { background: #F59E0B; }
+.dispatch-offline::before { background: #9CA3AF; }
+.dispatch-offline { opacity: 0.5; }
+
+.dispatch-card-status { font-size: 20px; margin-bottom: 4px; }
+.dispatch-card-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.dispatch-card-info { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+.dispatch-card-svc { font-size: 16px; margin-top: 2px; }
+.dispatch-card-meta { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+/* ========================================
+   🤖 AI Smart Dispatch Panel
+   ======================================== */
+
+.ai-dispatch-panel {
+  background: linear-gradient(135deg, #1E1B4B 0%, #312E81 100%);
+  border-radius: var(--radius);
+  padding: 16px;
+  color: white;
+  box-shadow: 0 4px 16px rgba(30, 27, 75, 0.3);
+}
+
+.ai-dispatch-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-dispatch-item {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.ai-dispatch-item:last-child { margin-bottom: 0; }
+
+.ai-suggest {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.ai-warn {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #FCD34D;
+}
+
+.ai-stat {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ========================================
+   💰 Chiết Khấu Table
+   ======================================== */
+
+.ck-table {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.ck-header {
+  display: grid;
+  grid-template-columns: 30px 1fr 50px 80px 80px;
+  padding: 10px 12px;
+  background: var(--primary-bg);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ck-row {
+  display: grid;
+  grid-template-columns: 30px 1fr 50px 80px 80px;
+  padding: 10px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  transition: background 0.15s;
+}
+
+.ck-row:last-child { border-bottom: none; }
+.ck-row:hover { background: var(--primary-bg); }
+
+.ck-rank {
+  font-weight: 700;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.ck-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ========================================
+   📋 Đơn Hàng (Order Feed)
+   ======================================== */
+
+.order-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  box-shadow: var(--shadow);
+  transition: all 0.2s;
+  border-left: 3px solid var(--primary);
+}
+
+.order-card:active { transform: scale(0.98); }
+
+.order-left { flex-shrink: 0; }
+.order-svc { font-size: 24px; }
+
+.order-center { flex: 1; min-width: 0; }
+.order-driver { font-size: 13px; font-weight: 700; color: var(--text); }
+.order-svc-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--primary);
+  background: var(--primary-bg);
+  padding: 1px 6px;
+  border-radius: 6px;
+  margin-left: 4px;
+}
+.order-note { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.order-right { text-align: right; flex-shrink: 0; }
+.order-amount { font-size: 15px; font-weight: 800; color: var(--text); }
+.order-time { font-size: 11px; color: var(--text-muted); }
+.order-status { font-size: 14px; }
+
+/* ========================================
+   📕 Công Nợ (Debt Groups)
+   ======================================== */
+
+.debt-group {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.debt-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--warning-bg);
+  border-bottom: 1px solid rgba(217, 119, 6, 0.15);
+}
+
+.debt-group-name { font-size: 14px; font-weight: 700; color: #92400E; }
+.debt-group-count {
+  font-size: 11px;
+  color: #B45309;
+  margin-left: 8px;
+  font-weight: 500;
+}
+.debt-group-total { font-size: 16px; font-weight: 800; color: #DC2626; }
+
+.debt-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.debt-item:last-child { border-bottom: none; }
+
+.debt-item-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.debt-item-amount { font-weight: 700; color: var(--danger); }
+
+.debt-item-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.debt-old {
+  background: #FFF5F5;
+}
+
+.debt-old-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #DC2626;
+  margin-top: 4px;
+}
+
+.debt-item-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ---- Smart Debt System ---- */
+
+/* Duplicate Warning Banner */
+.debt-warning-banner {
+  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 50%, #FCD34D 100%);
+  border: 2px solid #F59E0B;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+  animation: slideUp 0.3s ease;
+}
+
+.debt-warning-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400E;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.debt-merge-btn {
+  background: none;
+  border: 2px solid #B45309;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #B45309;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.debt-merge-btn:active {
+  background: #B45309;
+  color: white;
+  transform: scale(0.95);
+}
+
+/* Aging Badges */
+.debt-aging-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.debt-aging-badge.new {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.debt-aging-badge.warning {
+  background: var(--warning-bg);
+  color: #B45309;
+}
+
+.debt-aging-badge.danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  animation: pendingPulse 2s ease-in-out infinite;
+}
+
+/* Risk Badge */
+.debt-risk-high {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--danger-bg);
+  color: var(--danger);
+  margin-left: 6px;
+}
+
+/* Split Info Box */
+.debt-split-info {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: var(--info-bg);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1E40AF;
+  border: 1px solid rgba(37, 99, 235, 0.15);
+}
+
+/* Customer Stats Table */
+.debt-customer-stats {
+  margin-top: 0;
+}
+
+.debt-customer-stats .ck-table {
+  font-size: 12px;
+}
+
+.debt-customer-stats .ck-header {
+  font-size: 10px;
+}
+
+.debt-customer-stats .ck-row {
+  font-size: 12px;
+  padding: 8px 12px;
+}
+
+/* ========================================
+   🙋 Xin Phép (Leave Cards)
+   ======================================== */
+
+.leave-card {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow);
+  border-left: 3px solid var(--border);
+}
+
+.leave-pending { border-left-color: var(--warning); background: #FFFBEB; }
+
+.leave-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.leave-card-driver { font-size: 14px; font-weight: 700; color: var(--text); }
+.leave-card-type { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.leave-card-date { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.leave-card-status { font-size: 12px; font-weight: 600; }
+.leave-card-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* ========================================
+   💼 Tài Chính (Fund Cards)
+   ======================================== */
+
+.fund-card-start {
+  border-left: 3px solid var(--primary);
+}
+
+.fund-card-current {
+  border-left: 3px solid var(--success);
+}
+
+/* ========================================
+   Admin Nav Bar (7 tabs)
+   ======================================== */
+
+.admin-nav-bar {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  justify-content: flex-start !important;
+  gap: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.admin-nav-bar .nav-item {
+  min-width: 56px;
+  flex: 0 0 auto;
+  padding: 6px 4px;
+}
+
+.admin-nav-bar .nav-label {
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.admin-nav-bar .nav-icon {
+  font-size: 20px;
+}
+
+/* ========================================
+   Small Buttons
+   ======================================== */
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.btn-sm.btn-success { background: var(--success); color: white; }
+.btn-sm.btn-danger { background: var(--danger); color: white; }
+.btn-sm.btn-outline { background: none; border: 1px solid var(--border); color: var(--text-secondary); }
+.btn-sm:active { transform: scale(0.95); }
+
+/* ========================================
+   Desktop Dispatch Overrides
+   ======================================== */
+
+@media (min-width: 1024px) {
+  .dispatch-grid {
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+    padding: 16px 24px;
+  }
+
+  .dispatch-card {
+    padding: 16px 12px;
+  }
+
+  .ck-header,
+  .ck-row {
+    grid-template-columns: 40px 1.5fr 60px 100px 100px;
+  }
+
+  .admin-nav-bar {
+    justify-content: space-around !important;
+  }
+
+  .admin-nav-bar .nav-item {
+    min-width: auto;
+    flex: 1;
+  }
+}
